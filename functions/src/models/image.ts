@@ -5,8 +5,6 @@ export interface Image {
   filename: string;
   width: number;
   height: number;
-  depth: number;
-  type: string;
-  timestamp: admin.firestore.Timestamp;
   size: number;
+  timestamp: admin.firestore.Timestamp;
 }
