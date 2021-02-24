@@ -3,95 +3,112 @@ import * as admin from 'firebase-admin';
 import { Image } from '../../models/image';
 import * as sizeOf from 'buffer-image-size';
 
-enum ImageType {
-  Png = 'image/png',
-  Jpeg = 'image/jpeg',
-}
+const BUCKET_NAME = 'petai-bdd53.appspot.com';
 
-admin.initializeApp({
-  credential: admin.credential.cert(
-    'C:/Users/jonas/Documents/git-projects/petai-backend/petai-bdd53-firebase-adminsdk-omci2-91835c6ac7.json'
-  ),
-  storageBucket: 'petai-bdd53.appspot.com/',
-});
+admin.initializeApp();
 
-const bucket = admin.storage().bucket();
+const permittedImageTypes = ['content', 'style'];
+const permittedFileExtensions = ['jpg', 'jpeg'];
+const bucket = admin.storage().bucket(BUCKET_NAME);
 const imagesCollection = admin.firestore().collection('images');
 
 // Firebase functions include body-parser per default. Depending on the content-type of the request the body gets processed differently. For images this means that they have already been uploaded in its entirety at the moment this function is fired.
 export const createImage = async (req: Request, res: Response) => {
-  const { filename } = req.query;
-  const imageType = req.get('Content-Type');
+  const filename = req.query['filename'];
+  const imageType = req.query['image_type']
 
-  if (filename === undefined) {
+
+  if (filename === undefined || imageType === undefined) {
+    res.status(400).send('Missing query string information');
+  }
+  const contentType = req.get('Content-Type');
+  if (contentType === undefined || contentType !== 'image/jpeg') {
     res
       .status(400)
-      .send('The filename of the image has to be sent within the query params');
+      .send('Missing or invalid Content-Type (only image/jpeg is allowed)');
+  }
+  const filenameParts = (filename as string).split('.');
+  if (filenameParts.length < 2) {
+    res.status(400).send('Invalid filename');
+  }
+  const fileExtension = filenameParts[filenameParts.length - 1];
+  if (!isPermittedFileExtension(fileExtension)) {
+    res.status(400).send('File extension is not permitted');
+  }
+  if (!isPermittedImageType(imageType as string)) {
+    res.status(400).send('Invalid imageType query param');
   }
 
-  if (doesSupportImageType(imageType)) {
-    try {
-      const imageData = req.body;
-      await uploadImageToGoogleCloudStorage(
-        filename as string,
-        imageType as string,
-        imageData
-      );
-      const imageInfo = sizeOf(imageData);
-      const id = await createImageDocument(
-        filename as string,
-        imageInfo.width,
-        imageInfo.height,
-        imageType as string,
-        imageData.length
-      );
-      res.status(201).send({ id });
-    } catch (error) {
-      res.status(500).send(error);
-    }
-  } else {
-    res.status(400).send(`Image of type ${imageType} is not supported!`);
+  try {
+    const imageData = req.body;
+    const publicUrl = await uploadImageToGoogleCloudStorage(
+      filename as string,
+      contentType as string,
+      imageType as string,
+      imageData
+    );
+    const imageInfo = sizeOf(imageData);
+    await createImageDocument(
+      publicUrl,
+      filename as string,
+      imageInfo.width,
+      imageInfo.height,
+      imageData.length
+    );
+    res.status(201).send({ publicUrl });
+  } catch (error) {
+    res.status(500).send(error);
   }
 };
 
-const doesSupportImageType = (type?: string): boolean => {
-  return type === ImageType.Jpeg || type === ImageType.Png;
+const isPermittedFileExtension = (fileExtension: string): boolean => {
+  return permittedFileExtensions.includes(fileExtension.toLowerCase());
+};
+
+const isPermittedImageType = (imageType: string): boolean => {
+  return permittedImageTypes.includes(imageType);
 };
 
 const uploadImageToGoogleCloudStorage = (
   filename: string,
+  contentType: string,
   imageType: string,
   imageData: Buffer
-): Promise<void> => {
+): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const imageFile = bucket.file(`${filename}`);
+    const filepath =
+      imageType === 'content'
+        ? `content-images/${filename}`
+        : `style-images/${filename}`;
+    const imageFile = bucket.file(filepath);
     const imageWritableStream = imageFile.createWriteStream({
-      contentType: imageType,
+      contentType,
       resumable: false,
     });
     imageWritableStream.on('error', reject);
-    imageWritableStream.on('finish', resolve);
+    imageWritableStream.on('finish', async () => {
+      const publicUrl = `https://storage.gooleapis.com/${BUCKET_NAME}/${filepath}`;
+      resolve(publicUrl);
+    });
     imageWritableStream.write(imageData);
     imageWritableStream.end();
   });
 };
 
 const createImageDocument = async (
+  publicUrl: string,
   filename: string,
   width: number,
   height: number,
-  type: string,
   size: number
 ): Promise<string> => {
   const imageDocument: Image = {
-    publicUrl: `https://storage.googleapis.com/${bucket.name}/${filename}`,
+    publicUrl,
     filename,
     width,
     height,
-    depth: type === ImageType.Png ? 4 : 3,
-    type,
-    timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
     size,
+    timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
   };
   const documentReference = await imagesCollection.add(imageDocument);
   return documentReference.id;
