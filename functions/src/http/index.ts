@@ -1,5 +1,10 @@
+// 3rd party imports
 import * as express from 'express';
+
+// Custom imports
 import imageRouter from './images/router';
+import contentImageRouter from './content-images/router';
+import styleImageRouter from './style-images/router'
 
 const app = express();
 
@@ -11,5 +16,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/images', imageRouter);
+app.use('/content-images', contentImageRouter);
+app.use('/style-images', styleImageRouter)
 
 export default app;
