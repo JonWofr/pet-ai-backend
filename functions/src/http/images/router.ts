@@ -1,8 +1,12 @@
-import { Router } from 'express';
-import { createImage } from './controller';
+// 3rd party imports
+import * as express from 'express';
 
-const router = Router();
+// Custom imports
+import { createImage, checkFile } from './controller';
+import { upload } from '../../utils/multipart-formdata-middleware'
 
-router.post('/', createImage);
+const router = express.Router();
+
+router.post('/', upload, checkFile, createImage);
 
 export default router;
