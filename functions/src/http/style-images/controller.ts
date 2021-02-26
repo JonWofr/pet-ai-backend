@@ -2,14 +2,13 @@
 import * as sizeOf from 'buffer-image-size';
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-import * as firestore from '@google-cloud/firestore';
 
 // Custom imports
 import {
   uploadImageToGoogleCloudStorage,
   createImageDocument,
 } from '../images/controller';
-import { getPopulatedDocumentData } from '../content-images/controller'
+import { getPopulatedDocumentData } from '../content-images/controller';
 
 // Models
 import { StyleImage } from '../../models/style-image';
@@ -22,8 +21,8 @@ const styleImagesCollection = admin
   .collection('style-images')
   .withConverter({
     toFirestore: (styleImage: StyleImage) =>
-      styleImage as firestore.DocumentData,
-    fromFirestore: (documentData: firestore.DocumentData) =>
+      styleImage as admin.firestore.DocumentData,
+    fromFirestore: (documentData: admin.firestore.DocumentData) =>
       documentData as StyleImage,
   });
 
@@ -32,7 +31,11 @@ export const createStyleImage = async (
   res: express.Response
 ) => {
   const { name, artist } = req.body;
-  const { filename, mimetype, buffer } = (req as MultipartFormdataRequest).files[0];
+  const {
+    filename,
+    mimetype,
+    buffer,
+  } = (req as MultipartFormdataRequest).files[0];
 
   const filePath = 'style-images/' + filename;
   const publicUrl = await uploadImageToGoogleCloudStorage(
@@ -61,11 +64,11 @@ export const createStyleImage = async (
 };
 
 const createStyleImageDocument = async (
-  image: firestore.DocumentReference<Image>,
+  image: admin.firestore.DocumentReference<Image>,
   name: string,
   artist: string,
-  author: firestore.DocumentReference<User> | null
-): Promise<firestore.DocumentReference<StyleImage>> => {
+  author: admin.firestore.DocumentReference<User> | null
+): Promise<admin.firestore.DocumentReference<StyleImage>> => {
   const styleImage: StyleImage = {
     image,
     name,
@@ -94,16 +97,17 @@ export const fetchAllStyleImages = async (
         return populatedStyleImage;
       }
     );
-    const styleImages = await Promise.all(
-      populatedStyleImagesPromises
-    );
+    const styleImages = await Promise.all(populatedStyleImagesPromises);
     res.status(200).send({ styleImages });
   } catch (err) {
     res.status(500).send(err);
   }
 };
 
-export const fetchOneStyleImage = async (req: express.Request, res: express.Response) => {
+export const fetchOneStyleImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
   const { id } = req.params;
   try {
     const document = await styleImagesCollection.doc(id).get();
@@ -116,4 +120,4 @@ export const fetchOneStyleImage = async (req: express.Request, res: express.Resp
   } catch (err) {
     res.status(500).send(err);
   }
-}
+};

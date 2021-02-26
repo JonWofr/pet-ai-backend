@@ -1,7 +1,6 @@
 // 3rd party imports
 import * as express from 'express';
 import * as sizeOf from 'buffer-image-size';
-import * as firestore from '@google-cloud/firestore';
 import * as admin from 'firebase-admin';
 
 // Models
@@ -20,8 +19,8 @@ export const imagesCollection = admin
   .collection('images')
   // Explicit Type declaration for all documents inside the collection 'images'
   .withConverter<Image>({
-    toFirestore: (image: Image) => image as firestore.DocumentData,
-    fromFirestore: (documentData: firestore.DocumentData) =>
+    toFirestore: (image: Image) => image as admin.firestore.DocumentData,
+    fromFirestore: (documentData: admin.firestore.DocumentData) =>
       documentData as Image,
   });
 
@@ -134,7 +133,7 @@ export const createImageDocument = async (
   width: number,
   height: number,
   size: number
-): Promise<firestore.DocumentReference<Image>> => {
+): Promise<admin.firestore.DocumentReference<Image>> => {
   const image: Image = {
     publicUrl,
     filename,

@@ -6,7 +6,7 @@
     "serve": "set GOOGLE_APPLICATION_CREDENTIALS=C:\\Users\\jonas\\Documents\\git-projects\\petai-backend\\gcp-credentials.json&& npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "set GOOGLE_APPLICATION_CREDENTIALS=C:\\Users\\jonas\\Documents\\git-projects\\petai-backend\\gcp-credentials.json&& firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {

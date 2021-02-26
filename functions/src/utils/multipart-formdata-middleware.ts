@@ -38,7 +38,7 @@ export const upload = (
           fs.readFile(filepath, (err, buffer) => {
             const size = Buffer.byteLength(buffer);
             if (err) {
-              return reject(err);
+              reject(err);
             }
 
             files.push({
@@ -53,7 +53,7 @@ export const upload = (
             try {
               fs.unlinkSync(filepath);
             } catch (error) {
-              return reject(error);
+              reject(error);
             }
 
             resolve();

@@ -1,7 +1,6 @@
 // 3rd party imports
 import * as express from 'express';
 import * as sizeOf from 'buffer-image-size';
-import * as firestore from '@google-cloud/firestore';
 import * as admin from 'firebase-admin';
 
 // Custom imports
@@ -21,8 +20,8 @@ const contentImagesCollection = admin
   .collection('content-images')
   .withConverter({
     toFirestore: (contentImage: ContentImage) =>
-      contentImage as firestore.DocumentData,
-    fromFirestore: (documentData: firestore.DocumentData) =>
+      contentImage as admin.firestore.DocumentData,
+    fromFirestore: (documentData: admin.firestore.DocumentData) =>
       documentData as ContentImage,
   });
 
@@ -63,10 +62,10 @@ export const createContentImage = async (
 };
 
 const createContentImageDocument = async (
-  image: firestore.DocumentReference<Image>,
+  image: admin.firestore.DocumentReference<Image>,
   name: string,
-  author: firestore.DocumentReference<User> | null
-): Promise<firestore.DocumentReference<ContentImage>> => {
+  author: admin.firestore.DocumentReference<User> | null
+): Promise<admin.firestore.DocumentReference<ContentImage>> => {
   const contentImage: ContentImage = {
     image,
     name,
@@ -105,10 +104,10 @@ export const fetchAllContentImages = async (
 
 // Shallow document references of any document can be resolved with this method
 export const getPopulatedDocumentData = async (
-  document: firestore.DocumentSnapshot,
+  document: admin.firestore.DocumentSnapshot,
   referenceKeys: string[],
   shouldAddId: boolean = true
-): Promise<firestore.DocumentData> => {
+): Promise<admin.firestore.DocumentData> => {
   if (!document.exists) {
     throw new Error(
       'Document for which the references should be resolved does not exist'
@@ -123,7 +122,7 @@ export const getPopulatedDocumentData = async (
     .map(async (referenceKey) => {
       const referencedDocument = await (documentData[
         referenceKey
-      ] as firestore.DocumentReference).get();
+      ] as admin.firestore.DocumentReference).get();
       if (!referencedDocument.exists)
         throw new Error('References could not be resolved');
       const referencedDocumentData = referencedDocument.data()!;
