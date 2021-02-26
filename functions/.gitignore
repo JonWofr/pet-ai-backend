@@ -6,3 +6,6 @@
 typings/
 
 node_modules/
+
+# Sensitive information
+.runtimeconfig.json

@@ -5,6 +5,7 @@ import * as express from 'express';
 import imageRouter from './images/router';
 import contentImageRouter from './content-images/router';
 import styleImageRouter from './style-images/router'
+import stylizedImagesRouter from './stylized-images/router'
 
 const app = express();
 
@@ -18,5 +19,6 @@ app.use((req, res, next) => {
 app.use('/images', imageRouter);
 app.use('/content-images', contentImageRouter);
 app.use('/style-images', styleImageRouter)
+app.use('/stylized-images', stylizedImagesRouter)
 
 export default app;
