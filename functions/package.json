@@ -3,10 +3,10 @@
   "scripts": {
     "lint": "tslint --project tsconfig.json",
     "build": "tsc",
-    "serve": "set GOOGLE_APPLICATION_CREDENTIALS=C:\\Users\\jonas\\Documents\\git-projects\\petai-backend\\gcp-credentials.json&& npm run build && firebase emulators:start --only functions",
+    "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "set GOOGLE_APPLICATION_CREDENTIALS=C:\\Users\\jonas\\Documents\\git-projects\\petai-backend\\gcp-credentials.json&& firebase deploy --only functions",
+    "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {
