@@ -9,7 +9,7 @@ import {
   uploadImageToGoogleCloudStorage,
   createImageDocument,
 } from '../images/controller';
-import { resolveDocumentReferences } from '../content-images/controller'
+import { getPopulatedDocumentData } from '../content-images/controller'
 
 // Models
 import { StyleImage } from '../../models/style-image';
@@ -85,11 +85,11 @@ export const fetchAllStyleImages = async (
   try {
     const querySnapshot = await styleImagesCollection.get();
     const populatedStyleImagesPromises = querySnapshot.docs.map(
-      async (documentSnapshot) => {
-        const styleImage: StyleImage = documentSnapshot.data();
-        const populatedStyleImage = await resolveDocumentReferences(
-          styleImage,
-          ['image', 'user']
+      async (styleImageDocument) => {
+        const populatedStyleImage = await getPopulatedDocumentData(
+          styleImageDocument,
+          ['image', 'user'],
+          true
         );
         return populatedStyleImage;
       }
@@ -102,3 +102,18 @@ export const fetchAllStyleImages = async (
     res.status(500).send(err);
   }
 };
+
+export const fetchOneStyleImage = async (req: express.Request, res: express.Response) => {
+  const { id } = req.params;
+  try {
+    const document = await styleImagesCollection.doc(id).get();
+    const populatedStyleImage = await getPopulatedDocumentData(
+      document,
+      ['image', 'author'],
+      true
+    );
+    res.status(200).send(populatedStyleImage);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+}

@@ -31,7 +31,11 @@ export const createContentImage = async (
   res: express.Response
 ) => {
   const { name } = (req as MultipartFormdataRequest).body;
-  const { filename, mimetype, buffer } = (req as MultipartFormdataRequest).files[0];
+  const {
+    filename,
+    mimetype,
+    buffer,
+  } = (req as MultipartFormdataRequest).files[0];
 
   const filePath = 'content-images/' + filename;
   const publicUrl = await uploadImageToGoogleCloudStorage(
@@ -81,40 +85,71 @@ export const fetchAllContentImages = async (
   try {
     const querySnapshot = await contentImagesCollection.get();
     const populatedContentImagesPromises = querySnapshot.docs.map(
-      async (documentSnapshot) => {
-        const contentImage: ContentImage = documentSnapshot.data();
-        const populatedContentImage = await resolveDocumentReferences(
-          contentImage,
-          ['image', 'user']
+      async (contentImageDocument) => {
+        const populatedContentImage = await getPopulatedDocumentData(
+          contentImageDocument,
+          ['image', 'author'],
+          true
         );
         return populatedContentImage;
       }
     );
-    const contentImages = await Promise.all(
+    const populatedContentImages = await Promise.all(
       populatedContentImagesPromises
     );
-    res.status(200).send({ contentImages });
+    res.status(200).send(populatedContentImages);
   } catch (err) {
     res.status(500).send(err);
   }
 };
 
 // Shallow document references of any document can be resolved with this method
-export const resolveDocumentReferences = async <T>(
-  documentData: any,
-  referenceKeys: string[]
-): Promise<T> => {
+export const getPopulatedDocumentData = async (
+  document: firestore.DocumentSnapshot,
+  referenceKeys: string[],
+  shouldAddId: boolean = true
+): Promise<firestore.DocumentData> => {
+  if (!document.exists) {
+    throw new Error(
+      'Document for which the references should be resolved does not exist'
+    );
+  }
+  const documentData = document.data()!;
   const documentReferencesPromises = referenceKeys
     .filter((referenceKey) => {
       // Check if the key exists in the document and if the value of the key is not falsy
       return referenceKey in documentData && documentData[referenceKey];
     })
     .map(async (referenceKey) => {
-      const referencedDocumentData = (
-        await (documentData[referenceKey] as firestore.DocumentReference).get()
-      ).data();
+      const referencedDocument = await (documentData[
+        referenceKey
+      ] as firestore.DocumentReference).get();
+      if (!referencedDocument.exists)
+        throw new Error('References could not be resolved');
+      const referencedDocumentData = referencedDocument.data()!;
       documentData[referenceKey] = referencedDocumentData;
     });
   await Promise.all(documentReferencesPromises);
+  if (shouldAddId) {
+    documentData['id'] = document.id;
+  }
   return documentData;
+};
+
+export const fetchOneContentImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  const { id } = req.params;
+  try {
+    const document = await contentImagesCollection.doc(id).get();
+    const populatedContentImage = await getPopulatedDocumentData(
+      document,
+      ['image', 'author'],
+      true
+    );
+    res.status(200).send(populatedContentImage);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 };
