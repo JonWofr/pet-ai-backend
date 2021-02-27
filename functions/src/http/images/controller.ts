@@ -10,7 +10,7 @@ import { MultipartFormdataFile } from '../../models/multipart-formdata-file';
 import { PopulatedImage } from '../../models/populated-image';
 
 // Custom imports
-import { getPopulatedDocumentData } from '../content-images/controller';
+import { populateDocument } from '../content-images/controller';
 
 
 const allowedMimeTypes = ['image/jpeg'];
@@ -40,22 +40,27 @@ export const checkFile = (
 
     if (files.length !== 1) {
       res.status(400).send('Only one file is allowed for this endpoint');
+      return;
     }
 
     const { filename, mimetype, buffer } = files[0];
 
     if (!isFilenameValid(filename)) {
       res.status(400).send("The file's filename is missing or invalid");
+      return;
     }
     if (!isMimeTypeValid(mimetype)) {
       res.status(400).send("The file's mime-type is missing or invalid");
+      return;
     }
     if (buffer.length === 0) {
       res.status(400).send('The file does not contain any data');
+      return;
     }
     next();
   } catch (err) {
     res.status(500).send(err);
+    return;
   }
 };
 
@@ -105,17 +110,25 @@ export const createImage = async (
     );
 
     const imageInfo = sizeOf(buffer);
-    const imageDocumentReference = await createImageDocument(
+    const image = {
       publicUrl,
       filename,
-      imageInfo.width,
-      imageInfo.height,
-      buffer.length
-    );
+      width: imageInfo.width,
+      height: imageInfo.height,
+      size: buffer.length,
+      timestamp: admin.firestore.Timestamp.fromMillis(Date.now())
+    }
+    const imageDocumentReference = await createImageDocument(image);
+    const populatedImage: PopulatedImage = {
+      id: imageDocumentReference.id,
+      ...image
+    }
 
-    res.status(201).send({ imageId: imageDocumentReference.id });
+    res.status(201).send(populatedImage);
+    return;
   } catch (err) {
     res.status(500).send(err);
+    return;
   }
 };
 
@@ -140,21 +153,7 @@ export const uploadImageToGoogleCloudStorage = (
   });
 };
 
-export const createImageDocument = async (
-  publicUrl: string,
-  filename: string,
-  width: number,
-  height: number,
-  size: number
-): Promise<admin.firestore.DocumentReference<Image>> => {
-  const image: Image = {
-    publicUrl,
-    filename,
-    width,
-    height,
-    size,
-    timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
-  };
+export const createImageDocument = async (image: Image): Promise<admin.firestore.DocumentReference<Image>> => {
   const documentReference = await imagesCollection.add(image);
   return documentReference;
 };
@@ -165,20 +164,13 @@ export const fetchAllImages = async (
 ) => {
   try {
     const querySnapshot = await imagesCollection.get();
-    const populatedImagesPromises = querySnapshot.docs.map(
-      async (imageDocument) => {
-        const populatedImage = (await getPopulatedDocumentData(
-          imageDocument,
-          [],
-          true
-        )) as PopulatedImage;
-        return populatedImage;
-      }
-    );
+    const populatedImagesPromises = querySnapshot.docs.map((imageDocument) => populateDocument<PopulatedImage>(imageDocument, true));
     const populatedImages = await Promise.all(populatedImagesPromises);
     res.status(200).send(populatedImages);
+    return;
   } catch (err) {
     res.status(500).send(err);
+    return;
   }
 };
 
@@ -189,16 +181,11 @@ export const fetchOneImage = async (
   try {
     const { id } = req.params;
     const imageDocument = await imagesCollection.doc(id).get();
-    if (!imageDocument.exists) {
-      res.status(400).send('No image with this id does exist');
-    }
-    const populatedImage = (await getPopulatedDocumentData(
-      imageDocument,
-      [],
-      true
-    )) as PopulatedImage;
+    const populatedImage = await populateDocument<PopulatedImage>(imageDocument, true)
     res.status(200).send(populatedImage);
+    return;
   } catch (err) {
     res.status(500).send(err);
+    return;
   }
 };

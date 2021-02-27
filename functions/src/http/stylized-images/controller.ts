@@ -10,18 +10,15 @@ import { StylizedImage } from '../../models/stylized-image';
 import { PopulatedStylizedImage } from '../../models/populated-stylized-image';
 import { PopulatedContentImage } from '../../models/populated-content-image';
 import { PopulatedStyleImage } from '../../models/populated-style-image';
-import { ContentImage } from '../../models/content-image';
-import { StyleImage } from '../../models/style-image';
 import { Image } from '../../models/image';
 
 // Custom imports
 import {
   contentImagesCollection,
-  getPopulatedDocumentData,
+  populateDocument,
 } from '../content-images/controller';
 import { styleImagesCollection } from '../style-images/controller';
 import { createImageDocument } from '../images/controller';
-import { User } from '../../models/user';
 
 interface NstModelResponse {
   predictions: { stylizedImagePublicUrl: string }[];
@@ -47,15 +44,21 @@ export const createStylizedImage = async (
   try {
     const { contentImageId, styleImageId, name } = req.body;
 
-    const contentImageDocument = await contentImagesCollection
+    const contentImageDocumentPromise = contentImagesCollection
       .doc(contentImageId)
       .get();
-    const styleImageDocument = await styleImagesCollection
+    const styleImageDocumentPromise = styleImagesCollection
       .doc(styleImageId)
       .get();
 
+    const [contentImageDocument, styleImageDocument] = await Promise.all([
+      contentImageDocumentPromise,
+      styleImageDocumentPromise,
+    ]);
+
     if (!contentImageDocument.exists || !styleImageDocument.exists) {
       res.status(400).send('One or both ids are invalid');
+      return;
     }
 
     const contentImageDocumentReference = contentImageDocument.ref;
@@ -65,28 +68,29 @@ export const createStylizedImage = async (
       .where('styleImage', '==', styleImageDocumentReference)
       .get();
 
-    const populatedContentImage = await getPopulatedDocumentData(
+    const populatedContentImagePromise = populateDocument<PopulatedContentImage>(
       contentImageDocument,
-      ['image', 'author'],
       false
-    ) as PopulatedContentImage;
-
-    const populatedStyleImage = await getPopulatedDocumentData(
+    );
+    const populatedStyleImagePromise = populateDocument<PopulatedStyleImage>(
       styleImageDocument,
-      ['image', 'author'],
       false
-    ) as PopulatedStyleImage;
+    );
+
+    const [populatedContentImage, populatedStyleImage] = await Promise.all([
+      populatedContentImagePromise,
+      populatedStyleImagePromise,
+    ]);
 
     if (querySnapshot.size > 0) {
       const stylizedImageDocument = querySnapshot.docs[0];
-      const populatedStylizedImage = await getPopulatedDocumentData(
+      const populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
         stylizedImageDocument,
-        ['image'],
         true
-      ) as PopulatedStylizedImage;
-      populatedStylizedImage.contentImage = populatedContentImage;
-      populatedStylizedImage.styleImage = populatedStyleImage;
+      );
+
       res.status(200).send(populatedStylizedImage);
+      return;
     }
 
     const stylizedImagePublicUrl = await requestNstModel(
@@ -102,27 +106,41 @@ export const createStylizedImage = async (
     const buffer = await bucket.file(stylizedImagePath).download();
     const imageInfo = sizeOf(buffer[0]);
 
-    const imageDocumentReference = await createImageDocument(
-      stylizedImagePublicUrl,
-      stylizedImageFilename,
-      imageInfo.width,
-      imageInfo.height,
-      buffer.length
-    );
+    const image: Image = {
+      publicUrl: stylizedImagePublicUrl,
+      filename: stylizedImageFilename,
+      width: imageInfo.width,
+      height: imageInfo.height,
+      size: buffer.length,
+      timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
+    };
+    const imageDocumentReference = await createImageDocument(image);
 
-    const stylizedImageDocumentReference = await createStylizedImageDocument(
-      contentImageDocumentReference,
-      styleImageDocumentReference,
-      imageDocumentReference,
+    const stylizedImage: StylizedImage = {
+      contentImage: contentImageDocumentReference,
+      styleImage: styleImageDocumentReference,
+      image: imageDocumentReference,
       name,
-      null
+      author: null,
+    };
+    const stylizedImageDocumentReference = await createStylizedImageDocument(
+      stylizedImage
     );
 
-    res
-      .status(201)
-      .send({ stylizedImageId: stylizedImageDocumentReference.id });
+    const populatedStylizedImage: PopulatedStylizedImage = {
+      id: stylizedImageDocumentReference.id,
+      ...stylizedImage,
+      contentImage: populatedContentImage,
+      styleImage: populatedStyleImage,
+      image,
+      author: null,
+    };
+
+    res.status(201).send(populatedStylizedImage);
+    return;
   } catch (err) {
     res.status(500).send(err);
+    return;
   }
 };
 
@@ -196,22 +214,45 @@ const getImagePath = (imagePublicUrl: string) => {
   return imagePath;
 };
 
-const createStylizedImageDocument = async (
-  contentImage: admin.firestore.DocumentReference<ContentImage>,
-  styleImage: admin.firestore.DocumentReference<StyleImage>,
-  image: admin.firestore.DocumentReference<Image>,
-  name: string,
-  author: admin.firestore.DocumentReference<User> | null
-) => {
-  const stylizedImage: StylizedImage = {
-    contentImage,
-    styleImage,
-    image,
-    name,
-    author,
-  };
+const createStylizedImageDocument = async (stylizedImage: StylizedImage) => {
   const stylizedImageDocumentReference = await stylizedImagesCollection.add(
     stylizedImage
   );
   return stylizedImageDocumentReference;
+};
+
+export const fetchAllStylizedImages = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const querySnapshot = await stylizedImagesCollection.get();
+    const populatedStylizedImagesPromises = querySnapshot.docs.map(
+      (stylizedImageDocument) =>
+        populateDocument<PopulatedStylizedImage>(stylizedImageDocument, true)
+    );
+    const populatedStylizedImages = await Promise.all(
+      populatedStylizedImagesPromises
+    );
+    res.status(200).send(populatedStylizedImages);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+};
+
+export const fetchOneStylizedImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { id } = req.params;
+    const stylizedImageDocument = await stylizedImagesCollection.doc(id).get();
+    const populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
+      stylizedImageDocument,
+      true
+    );
+    res.status(200).send(populatedStylizedImage);
+  } catch (err) {
+    res.status(500).send(err);
+  }
 };
