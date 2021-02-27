@@ -14,8 +14,9 @@ import { User } from '../../models/user';
 import { Image } from '../../models/image';
 import { ContentImage } from '../../models/content-image';
 import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
+import { PopulatedContentImage } from '../../models/populated-content-image';
 
-const contentImagesCollection = admin
+export const contentImagesCollection = admin
   .firestore()
   .collection('content-images')
   .withConverter({
@@ -29,36 +30,40 @@ export const createContentImage = async (
   req: express.Request,
   res: express.Response
 ) => {
-  const { name } = (req as MultipartFormdataRequest).body;
-  const {
-    filename,
-    mimetype,
-    buffer,
-  } = (req as MultipartFormdataRequest).files[0];
+  try {
+    const { name } = (req as MultipartFormdataRequest).body;
+    const {
+      filename,
+      mimetype,
+      buffer,
+    } = (req as MultipartFormdataRequest).files[0];
 
-  const filePath = 'content-images/' + filename;
-  const publicUrl = await uploadImageToGoogleCloudStorage(
-    filePath,
-    mimetype,
-    buffer
-  );
+    const filePath = 'content-images/' + filename;
+    const publicUrl = await uploadImageToGoogleCloudStorage(
+      filePath,
+      mimetype,
+      buffer
+    );
 
-  const imageInfo = sizeOf(buffer);
-  const imageDocumentReference = await createImageDocument(
-    publicUrl,
-    filename,
-    imageInfo.width,
-    imageInfo.height,
-    buffer.length
-  );
+    const imageInfo = sizeOf(buffer);
+    const imageDocumentReference = await createImageDocument(
+      publicUrl,
+      filename,
+      imageInfo.width,
+      imageInfo.height,
+      buffer.length
+    );
 
-  const contentImageDocumentReference = await createContentImageDocument(
-    imageDocumentReference,
-    name,
-    null
-  );
+    const contentImageDocumentReference = await createContentImageDocument(
+      imageDocumentReference,
+      name,
+      null
+    );
 
-  res.status(201).send({ contentImageId: contentImageDocumentReference.id });
+    res.status(201).send({ contentImageId: contentImageDocumentReference.id });
+  } catch (err) {
+    res.status(500).send(err);
+  }
 };
 
 const createContentImageDocument = async (
@@ -85,11 +90,11 @@ export const fetchAllContentImages = async (
     const querySnapshot = await contentImagesCollection.get();
     const populatedContentImagesPromises = querySnapshot.docs.map(
       async (contentImageDocument) => {
-        const populatedContentImage = await getPopulatedDocumentData(
+        const populatedContentImage = (await getPopulatedDocumentData(
           contentImageDocument,
           ['image', 'author'],
           true
-        );
+        )) as PopulatedContentImage;
         return populatedContentImage;
       }
     );
@@ -142,11 +147,11 @@ export const fetchOneContentImage = async (
   const { id } = req.params;
   try {
     const document = await contentImagesCollection.doc(id).get();
-    const populatedContentImage = await getPopulatedDocumentData(
+    const populatedContentImage = (await getPopulatedDocumentData(
       document,
       ['image', 'author'],
       true
-    );
+    )) as PopulatedContentImage;
     res.status(200).send(populatedContentImage);
   } catch (error) {
     res.status(500).send(error);

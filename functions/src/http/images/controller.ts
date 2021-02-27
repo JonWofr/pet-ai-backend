@@ -7,13 +7,18 @@ import * as admin from 'firebase-admin';
 import { Image } from '../../models/image';
 import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { MultipartFormdataFile } from '../../models/multipart-formdata-file';
+import { PopulatedImage } from '../../models/populated-image';
 
-const BUCKET_NAME = 'petai-bdd53.appspot.com';
+// Custom imports
+import { getPopulatedDocumentData } from '../content-images/controller';
+
 
 const allowedMimeTypes = ['image/jpeg'];
 const allowedFileExtensions = ['jpg', 'jpeg'];
 
+const BUCKET_NAME = 'petai-bdd53.appspot.com';
 const bucket = admin.storage().bucket(BUCKET_NAME);
+
 export const imagesCollection = admin
   .firestore()
   .collection('images')
@@ -29,25 +34,29 @@ export const checkFile = (
   res: express.Response,
   next: express.NextFunction
 ) => {
-  const files: MultipartFormdataFile[] = (req as MultipartFormdataRequest)
-    .files;
+  try {
+    const files: MultipartFormdataFile[] = (req as MultipartFormdataRequest)
+      .files;
 
-  if (files.length !== 1) {
-    res.status(400).send('Only one file is allowed for this endpoint');
-  }
+    if (files.length !== 1) {
+      res.status(400).send('Only one file is allowed for this endpoint');
+    }
 
-  const { filename, mimetype, buffer } = files[0];
+    const { filename, mimetype, buffer } = files[0];
 
-  if (!isFilenameValid(filename)) {
-    res.status(400).send("The file's filename is missing or invalid");
+    if (!isFilenameValid(filename)) {
+      res.status(400).send("The file's filename is missing or invalid");
+    }
+    if (!isMimeTypeValid(mimetype)) {
+      res.status(400).send("The file's mime-type is missing or invalid");
+    }
+    if (buffer.length === 0) {
+      res.status(400).send('The file does not contain any data');
+    }
+    next();
+  } catch (err) {
+    res.status(500).send(err);
   }
-  if (!isMimeTypeValid(mimetype)) {
-    res.status(400).send("The file's mime-type is missing or invalid");
-  }
-  if (buffer.length === 0) {
-    res.status(400).send('The file does not contain any data');
-  }
-  next();
 };
 
 export const isFilenameValid = (filename?: string): boolean => {
@@ -82,28 +91,32 @@ export const createImage = async (
   req: express.Request,
   res: express.Response
 ) => {
-  const {
-    filename,
-    mimetype,
-    buffer,
-  } = (req as MultipartFormdataRequest).files[0];
+  try {
+    const {
+      filename,
+      mimetype,
+      buffer,
+    } = (req as MultipartFormdataRequest).files[0];
 
-  const publicUrl = await uploadImageToGoogleCloudStorage(
-    filename,
-    mimetype,
-    buffer
-  );
+    const publicUrl = await uploadImageToGoogleCloudStorage(
+      filename,
+      mimetype,
+      buffer
+    );
 
-  const imageInfo = sizeOf(buffer);
-  const imageDocumentReference = await createImageDocument(
-    publicUrl,
-    filename,
-    imageInfo.width,
-    imageInfo.height,
-    buffer.length
-  );
+    const imageInfo = sizeOf(buffer);
+    const imageDocumentReference = await createImageDocument(
+      publicUrl,
+      filename,
+      imageInfo.width,
+      imageInfo.height,
+      buffer.length
+    );
 
-  res.status(201).send({ imageId: imageDocumentReference.id });
+    res.status(201).send({ imageId: imageDocumentReference.id });
+  } catch (err) {
+    res.status(500).send(err);
+  }
 };
 
 export const uploadImageToGoogleCloudStorage = (
@@ -144,4 +157,48 @@ export const createImageDocument = async (
   };
   const documentReference = await imagesCollection.add(image);
   return documentReference;
+};
+
+export const fetchAllImages = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const querySnapshot = await imagesCollection.get();
+    const populatedImagesPromises = querySnapshot.docs.map(
+      async (imageDocument) => {
+        const populatedImage = (await getPopulatedDocumentData(
+          imageDocument,
+          [],
+          true
+        )) as PopulatedImage;
+        return populatedImage;
+      }
+    );
+    const populatedImages = await Promise.all(populatedImagesPromises);
+    res.status(200).send(populatedImages);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+};
+
+export const fetchOneImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const { id } = req.params;
+    const imageDocument = await imagesCollection.doc(id).get();
+    if (!imageDocument.exists) {
+      res.status(400).send('No image with this id does exist');
+    }
+    const populatedImage = (await getPopulatedDocumentData(
+      imageDocument,
+      [],
+      true
+    )) as PopulatedImage;
+    res.status(200).send(populatedImage);
+  } catch (err) {
+    res.status(500).send(err);
+  }
 };
