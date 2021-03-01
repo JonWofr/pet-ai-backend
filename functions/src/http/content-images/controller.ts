@@ -4,10 +4,10 @@ import * as sizeOf from 'buffer-image-size';
 import * as admin from 'firebase-admin';
 
 // Custom imports
-import {
-  uploadImageToGoogleCloudStorage,
-  createImageDocument,
-} from '../images/controller';
+import { createImageDocument } from '../images/controller';
+import { populateDocument } from '../../utils/database-helper';
+import { stylizedImagesCollection } from '../stylized-images/controller';
+import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
 
 // Models
 import { Image } from '../../models/image';
@@ -38,7 +38,7 @@ export const createContentImage = async (
     } = (req as MultipartFormdataRequest).files[0];
 
     const filePath = 'content-images/' + filename;
-    const publicUrl = await uploadImageToGoogleCloudStorage(
+    const publicUrl = await uploadFileToGoogleCloudStorage(
       filePath,
       mimetype,
       buffer
@@ -93,7 +93,10 @@ export const fetchAllContentImages = async (
 ) => {
   try {
     const querySnapshot = await contentImagesCollection.get();
-    const populatedContentImagesPromises = querySnapshot.docs.map(contentImageDocument => populateDocument<PopulatedContentImage>(contentImageDocument, true));
+    const populatedContentImagesPromises = querySnapshot.docs.map(
+      (contentImageDocument) =>
+        populateDocument<PopulatedContentImage>(contentImageDocument, true)
+    );
     const populatedContentImages = await Promise.all(
       populatedContentImagesPromises
     );
@@ -105,7 +108,6 @@ export const fetchAllContentImages = async (
   }
 };
 
-
 export const fetchOneContentImage = async (
   req: express.Request,
   res: express.Response
@@ -113,7 +115,10 @@ export const fetchOneContentImage = async (
   const { id } = req.params;
   try {
     const contentImageDocument = await contentImagesCollection.doc(id).get();
-    const populatedContentImage = await populateDocument<PopulatedContentImage>(contentImageDocument, true)
+    const populatedContentImage = await populateDocument<PopulatedContentImage>(
+      contentImageDocument,
+      true
+    );
     res.status(200).send(populatedContentImage);
     return;
   } catch (error) {
@@ -122,40 +127,36 @@ export const fetchOneContentImage = async (
   }
 };
 
-export const populateDocument = async <T>(document: admin.firestore.DocumentSnapshot, shouldAddId = true): Promise<T> => {
-  if (!document.exists) {
-    throw new Error('Document for which the references should be resolved does not exist')
-  }
-  const recursivelyResolveReferences = async (
-    documentData: admin.firestore.DocumentData
-  ) => {
-    const populatedDocument: any = {};
-    for (let key in documentData) {
-      const value = documentData[key];
-      if (value instanceof admin.firestore.DocumentReference) {
-        const referencedDocument = await (value as admin.firestore.DocumentReference).get();
-        if (referencedDocument.exists) {
-          const referencedDocumentData = referencedDocument.data()!;
-          populatedDocument[key] = await recursivelyResolveReferences(
-            referencedDocumentData
-          );
-        } else {
-          throw new Error(
-            `DocumentData with key ${key} has invalid reference of value ${value}`
-          );
-        }
-      } else {
-        populatedDocument[key] = value;
-      }
-    }
-    return populatedDocument;
-  };
+export const deleteContentImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  const { id } = req.params;
+  const contentImageDocumentReference = contentImagesCollection.doc(id);
+  const contentImageDocument = await contentImageDocumentReference.get();
 
-  const populatedDocument = await recursivelyResolveReferences(document.data()!)
-
-  if (shouldAddId) {
-    populatedDocument.id = document.id
+  if (!contentImageDocument.exists) {
+    res.status(400).send(`Document with id ${id} does not exist`);
+    return;
   }
 
-  return populatedDocument
+  // Delete all stylized image documents that reference this one
+  const stylizedImageQuerySnaphot = await stylizedImagesCollection
+    .where('contentImage', '==', contentImageDocumentReference)
+    .get();
+  const stylizedImageDeletionsPromises = stylizedImageQuerySnaphot.docs.map(
+    (stylizedImageDocument) =>
+      stylizedImagesCollection.doc(stylizedImageDocument.id).delete()
+  );
+  await Promise.all(stylizedImageDeletionsPromises);
+
+  // Delete corresponding document
+  await contentImageDocumentReference.delete();
+
+  // Delete the image document that is referenced by this one
+  const contentImage = contentImageDocument.data()!;
+  await contentImage.image.delete();
+
+  res.status(200).send({ success: true });
+  return;
 };

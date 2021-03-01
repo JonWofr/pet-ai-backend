@@ -1,11 +1,11 @@
 // Models
-import { Image } from './image';
-import { User } from './user';
+import { PopulatedImage } from './populated-image';
+import { PopulatedUser } from './populated-user';
 
 export interface PopulatedStyleImage {
   id?: string;
-  image: Image;
+  image: PopulatedImage;
   name: string;
   artist: string;
-  author: User | null;
+  author: PopulatedUser | null;
 }
