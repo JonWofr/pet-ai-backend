@@ -66,3 +66,6 @@ node_modules/
 
 # Authentication files
 gcp-credentials.json
+
+# IDE files
+.vscode/

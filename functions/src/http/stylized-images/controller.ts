@@ -13,12 +13,10 @@ import { PopulatedStyleImage } from '../../models/populated-style-image';
 import { Image } from '../../models/image';
 
 // Custom imports
-import {
-  contentImagesCollection,
-  populateDocument,
-} from '../content-images/controller';
+import { contentImagesCollection } from '../content-images/controller';
 import { styleImagesCollection } from '../style-images/controller';
 import { createImageDocument } from '../images/controller';
+import { populateDocument } from '../../utils/database-helper';
 
 interface NstModelResponse {
   predictions: { stylizedImagePublicUrl: string }[];
@@ -27,7 +25,7 @@ interface NstModelResponse {
 const BUCKET_NAME = 'petai-bdd53.appspot.com';
 const bucket = admin.storage().bucket(BUCKET_NAME);
 
-const stylizedImagesCollection = admin
+export const stylizedImagesCollection = admin
   .firestore()
   .collection('stylized-images')
   .withConverter({
@@ -255,4 +253,14 @@ export const fetchOneStylizedImage = async (
   } catch (err) {
     res.status(500).send(err);
   }
+};
+
+export const deleteStylizedImage = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  const { id } = req.params;
+  await stylizedImagesCollection.doc(id).delete();
+  res.status(200).send({ success: true });
+  return;
 };

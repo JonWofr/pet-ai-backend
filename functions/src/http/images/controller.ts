@@ -1,6 +1,5 @@
 // 3rd party imports
 import * as express from 'express';
-import * as sizeOf from 'buffer-image-size';
 import * as admin from 'firebase-admin';
 
 // Models
@@ -10,14 +9,10 @@ import { MultipartFormdataFile } from '../../models/multipart-formdata-file';
 import { PopulatedImage } from '../../models/populated-image';
 
 // Custom imports
-import { populateDocument } from '../content-images/controller';
-
+import { populateDocument } from '../../utils/database-helper';
 
 const allowedMimeTypes = ['image/jpeg'];
 const allowedFileExtensions = ['jpg', 'jpeg'];
-
-const BUCKET_NAME = 'petai-bdd53.appspot.com';
-const bucket = admin.storage().bucket(BUCKET_NAME);
 
 export const imagesCollection = admin
   .firestore()
@@ -90,67 +85,6 @@ export const isMimeTypeValid = (mimeType?: string): boolean => {
 
 const isMimeTypeAllowed = (mimeType: string): boolean => {
   return allowedMimeTypes.includes(mimeType);
-};
-
-export const createImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
-    const {
-      filename,
-      mimetype,
-      buffer,
-    } = (req as MultipartFormdataRequest).files[0];
-
-    const publicUrl = await uploadImageToGoogleCloudStorage(
-      filename,
-      mimetype,
-      buffer
-    );
-
-    const imageInfo = sizeOf(buffer);
-    const image = {
-      publicUrl,
-      filename,
-      width: imageInfo.width,
-      height: imageInfo.height,
-      size: buffer.length,
-      timestamp: admin.firestore.Timestamp.fromMillis(Date.now())
-    }
-    const imageDocumentReference = await createImageDocument(image);
-    const populatedImage: PopulatedImage = {
-      id: imageDocumentReference.id,
-      ...image
-    }
-
-    res.status(201).send(populatedImage);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
-  }
-};
-
-export const uploadImageToGoogleCloudStorage = (
-  filename: string,
-  contentType: string,
-  buffer: Buffer
-): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const imageFile = bucket.file(filename);
-    const imageWritableStream = imageFile.createWriteStream({
-      contentType,
-      resumable: false,
-    });
-    imageWritableStream.on('error', reject);
-    imageWritableStream.on('finish', () => {
-      const publicUrl = `https://storage.gooleapis.com/${BUCKET_NAME}/${filename}`;
-      resolve(publicUrl);
-    });
-    imageWritableStream.write(buffer);
-    imageWritableStream.end();
-  });
 };
 
 export const createImageDocument = async (image: Image): Promise<admin.firestore.DocumentReference<Image>> => {
