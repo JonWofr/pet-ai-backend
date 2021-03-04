@@ -63,3 +63,9 @@ node_modules/
 
 # dotenv environment variables file
 .env
+
+# Authentication files
+gcp-credentials.json
+
+# IDE files
+.vscode/
