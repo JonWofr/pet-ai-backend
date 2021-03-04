@@ -9,28 +9,6 @@ export const populateDocument = async <T>(
       'Document for which the references should be resolved does not exist'
     );
   }
-  const recursivelyResolveReferences = async (
-    documentData: admin.firestore.DocumentData
-  ) => {
-    const populatedDocument: any = {};
-    for (let key in documentData) {
-      const value = documentData[key];
-      if (value instanceof admin.firestore.DocumentReference) {
-        const referencedDocument = await (value as admin.firestore.DocumentReference).get();
-        if (referencedDocument.exists) {
-          const referencedDocumentData = referencedDocument.data()!;
-          populatedDocument[key] = await recursivelyResolveReferences(
-            referencedDocumentData
-          );
-        } else {
-          populatedDocument[key] = null;
-        }
-      } else {
-        populatedDocument[key] = value;
-      }
-    }
-    return populatedDocument;
-  };
 
   const populatedDocument = await recursivelyResolveReferences(
     document.data()!
@@ -40,5 +18,28 @@ export const populateDocument = async <T>(
     populatedDocument.id = document.id;
   }
 
+  return populatedDocument;
+};
+
+const recursivelyResolveReferences = async (
+  documentData: admin.firestore.DocumentData
+) => {
+  const populatedDocument: any = {};
+  for (const key in documentData) {
+    const value = documentData[key];
+    if (value instanceof admin.firestore.DocumentReference) {
+      const referencedDocument = await (value as admin.firestore.DocumentReference).get();
+      if (referencedDocument.exists) {
+        const referencedDocumentData = referencedDocument.data()!;
+        populatedDocument[key] = await recursivelyResolveReferences(
+          referencedDocumentData
+        );
+      } else {
+        populatedDocument[key] = null;
+      }
+    } else {
+      populatedDocument[key] = value;
+    }
+  }
   return populatedDocument;
 };
