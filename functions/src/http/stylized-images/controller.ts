@@ -80,9 +80,10 @@ export const createStylizedImage = async (
       populatedStyleImagePromise,
     ]);
 
+    let populatedStylizedImage: PopulatedStylizedImage | undefined
     if (querySnapshot.size > 0) {
       const stylizedImageDocument = querySnapshot.docs[0];
-      const populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
+      populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
         stylizedImageDocument,
         true
       );
@@ -125,7 +126,7 @@ export const createStylizedImage = async (
       stylizedImage
     );
 
-    const populatedStylizedImage: PopulatedStylizedImage = {
+    populatedStylizedImage = {
       id: stylizedImageDocumentReference.id,
       ...stylizedImage,
       contentImage: populatedContentImage,

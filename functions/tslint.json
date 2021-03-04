@@ -111,7 +111,7 @@
     "trailing-comma": {"severity": "warning"},
 
     // Custom rules
-    "typedef": [true, "call-signature", "arrow-call-signature"]
+    "typedef": [true, "call-signature"]
   },
 
   "defaultSeverity": "error"

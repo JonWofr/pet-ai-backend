@@ -1,5 +1,6 @@
 // 3rd party imports
 import * as express from 'express';
+import * as functions from 'firebase-functions'
 
 // Custom imports
 import imageRouter from './images/router';
@@ -10,7 +11,7 @@ import stylizedImagesRouter from './stylized-images/router'
 const app = express();
 
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:4200');
+  res.header('Access-Control-Allow-Origin', functions.config().frontend.url);
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   console.log(new Date().toISOString(), req.method, req.originalUrl);
   next();
