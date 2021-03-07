@@ -1,12 +1,17 @@
+// 3rd party imports
 import * as admin from 'firebase-admin';
+
+// Custom imports
+import { DocumentDoesNotExistException } from '../utils/exceptions/document-does-not-exist-execption';
 
 export const populateDocument = async <T>(
   document: admin.firestore.DocumentSnapshot,
   shouldAddId = true
 ): Promise<T> => {
   if (!document.exists) {
-    throw new Error(
-      'Document for which the references should be resolved does not exist'
+    throw new DocumentDoesNotExistException(
+      `The document with id ${document.id} does not exist`,
+      404
     );
   }
 

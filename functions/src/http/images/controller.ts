@@ -10,6 +10,8 @@ import { PopulatedImage } from '../../models/populated-image';
 
 // Custom imports
 import { populateDocument } from '../../utils/database-helper';
+import { InvalidUploadException } from '../../utils/exceptions/invalid-upload-exception';
+import { catchAsync } from '../../utils/exception-handling-middleware';
 
 const allowedMimeTypes = ['image/jpeg'];
 const allowedFileExtensions = ['jpg', 'jpeg'];
@@ -29,34 +31,34 @@ export const checkFile = (
   res: express.Response,
   next: express.NextFunction
 ) => {
-  try {
-    const files: MultipartFormdataFile[] = (req as MultipartFormdataRequest)
-      .files;
+  const files: MultipartFormdataFile[] = (req as MultipartFormdataRequest)
+    .files;
 
-    if (files.length !== 1) {
-      res.status(400).send('Only one file is allowed for this endpoint');
-      return;
-    }
-
-    const { filename, mimetype, buffer } = files[0];
-
-    if (!isFilenameValid(filename)) {
-      res.status(400).send("The file's filename is missing or invalid");
-      return;
-    }
-    if (!isMimeTypeValid(mimetype)) {
-      res.status(400).send("The file's mime-type is missing or invalid");
-      return;
-    }
-    if (buffer.length === 0) {
-      res.status(400).send('The file does not contain any data');
-      return;
-    }
-    next();
-  } catch (err) {
-    res.status(500).send(err);
-    return;
+  if (files.length !== 1) {
+    throw new InvalidUploadException(
+      'Only one file is allowed for this endpoint',
+      400
+    );
   }
+
+  const { filename, mimetype, buffer } = files[0];
+
+  if (!isFilenameValid(filename)) {
+    throw new InvalidUploadException(
+      "The file's filename is missing or invalid",
+      400
+    );
+  }
+  if (!isMimeTypeValid(mimetype)) {
+    throw new InvalidUploadException(
+      "The file's mime-type is missing or invalid",
+      400
+    );
+  }
+  if (buffer.length === 0) {
+    throw new InvalidUploadException('The file does not contain any data', 400);
+  }
+  next();
 };
 
 export const isFilenameValid = (filename?: string): boolean => {
@@ -87,39 +89,32 @@ const isMimeTypeAllowed = (mimeType: string): boolean => {
   return allowedMimeTypes.includes(mimeType);
 };
 
-export const createImageDocument = async (image: Image): Promise<admin.firestore.DocumentReference<Image>> => {
+export const createImageDocument = async (
+  image: Image
+): Promise<admin.firestore.DocumentReference<Image>> => {
   const documentReference = await imagesCollection.add(image);
   return documentReference;
 };
 
-export const fetchAllImages = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const fetchAllImages = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const querySnapshot = await imagesCollection.get();
-    const populatedImagesPromises = querySnapshot.docs.map((imageDocument) => populateDocument<PopulatedImage>(imageDocument, true));
+    const populatedImagesPromises = querySnapshot.docs.map((imageDocument) =>
+      populateDocument<PopulatedImage>(imageDocument, true)
+    );
     const populatedImages = await Promise.all(populatedImagesPromises);
     res.status(200).send(populatedImages);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
   }
-};
+);
 
-export const fetchOneImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const fetchOneImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const { id } = req.params;
     const imageDocument = await imagesCollection.doc(id).get();
-    const populatedImage = await populateDocument<PopulatedImage>(imageDocument, true)
+    const populatedImage = await populateDocument<PopulatedImage>(
+      imageDocument,
+      true
+    );
     res.status(200).send(populatedImage);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
   }
-};
+);

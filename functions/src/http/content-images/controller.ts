@@ -8,6 +8,8 @@ import { createImageDocument } from '../images/controller';
 import { populateDocument } from '../../utils/database-helper';
 import { stylizedImagesCollection } from '../stylized-images/controller';
 import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
+import { catchAsync } from '../../utils/exception-handling-middleware';
+import { DocumentDoesNotExistException } from '../../utils/exceptions/document-does-not-exist-execption';
 
 // Models
 import { Image } from '../../models/image';
@@ -25,11 +27,8 @@ export const contentImagesCollection = admin
       documentData as ContentImage,
   });
 
-export const createContentImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const createContentImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const { name } = (req as MultipartFormdataRequest).body;
     const {
       filename,
@@ -71,12 +70,8 @@ export const createContentImage = async (
       author: null,
     };
     res.status(201).send(populatedContentImage);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
   }
-};
+);
 
 const createContentImageDocument = async (
   contentImage: ContentImage
@@ -87,11 +82,8 @@ const createContentImageDocument = async (
   return contentImageDocumentReference;
 };
 
-export const fetchAllContentImages = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const fetchAllContentImages = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const querySnapshot = await contentImagesCollection.get();
     const populatedContentImagesPromises = querySnapshot.docs.map(
       (contentImageDocument) =>
@@ -101,62 +93,52 @@ export const fetchAllContentImages = async (
       populatedContentImagesPromises
     );
     res.status(200).send(populatedContentImages);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
   }
-};
+);
 
-export const fetchOneContentImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  const { id } = req.params;
-  try {
+export const fetchOneContentImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
+    const { id } = req.params;
     const contentImageDocument = await contentImagesCollection.doc(id).get();
     const populatedContentImage = await populateDocument<PopulatedContentImage>(
       contentImageDocument,
       true
     );
     res.status(200).send(populatedContentImage);
-    return;
-  } catch (error) {
-    res.status(500).send(error);
+  }
+);
+
+export const deleteContentImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
+    const { id } = req.params;
+    const contentImageDocumentReference = contentImagesCollection.doc(id);
+    const contentImageDocument = await contentImageDocumentReference.get();
+
+    if (!contentImageDocument.exists) {
+      throw new DocumentDoesNotExistException(
+        `The document with id ${contentImageDocument.id} does not exist`,
+        404
+      );
+    }
+
+    // Delete all stylized image documents that reference this one
+    const stylizedImageQuerySnaphot = await stylizedImagesCollection
+      .where('contentImage', '==', contentImageDocumentReference)
+      .get();
+    const stylizedImageDeletionsPromises = stylizedImageQuerySnaphot.docs.map(
+      (stylizedImageDocument) =>
+        stylizedImagesCollection.doc(stylizedImageDocument.id).delete()
+    );
+    await Promise.all(stylizedImageDeletionsPromises);
+
+    // Delete corresponding document
+    await contentImageDocumentReference.delete();
+
+    // Delete the image document that is referenced by this one
+    const contentImage = contentImageDocument.data()!;
+    await contentImage.image.delete();
+
+    res.status(200).send({ success: true });
     return;
   }
-};
-
-export const deleteContentImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  const { id } = req.params;
-  const contentImageDocumentReference = contentImagesCollection.doc(id);
-  const contentImageDocument = await contentImageDocumentReference.get();
-
-  if (!contentImageDocument.exists) {
-    res.status(400).send(`Document with id ${id} does not exist`);
-    return;
-  }
-
-  // Delete all stylized image documents that reference this one
-  const stylizedImageQuerySnaphot = await stylizedImagesCollection
-    .where('contentImage', '==', contentImageDocumentReference)
-    .get();
-  const stylizedImageDeletionsPromises = stylizedImageQuerySnaphot.docs.map(
-    (stylizedImageDocument) =>
-      stylizedImagesCollection.doc(stylizedImageDocument.id).delete()
-  );
-  await Promise.all(stylizedImageDeletionsPromises);
-
-  // Delete corresponding document
-  await contentImageDocumentReference.delete();
-
-  // Delete the image document that is referenced by this one
-  const contentImage = contentImageDocument.data()!;
-  await contentImage.image.delete();
-
-  res.status(200).send({ success: true });
-  return;
-};
+);
