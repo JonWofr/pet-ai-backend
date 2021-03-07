@@ -17,6 +17,8 @@ import { contentImagesCollection } from '../content-images/controller';
 import { styleImagesCollection } from '../style-images/controller';
 import { createImageDocument } from '../images/controller';
 import { populateDocument } from '../../utils/database-helper';
+import { catchAsync } from '../../utils/exception-handling-middleware';
+import { DocumentDoesNotExistException } from '../../utils/exceptions/document-does-not-exist-execption';
 
 interface NstModelResponse {
   predictions: { stylizedImagePublicUrl: string }[];
@@ -35,11 +37,8 @@ export const stylizedImagesCollection = admin
       documentData as StylizedImage,
   });
 
-export const createStylizedImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const createStylizedImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const { contentImageId, styleImageId, name } = req.body;
 
     const contentImageDocumentPromise = contentImagesCollection
@@ -54,9 +53,16 @@ export const createStylizedImage = async (
       styleImageDocumentPromise,
     ]);
 
-    if (!contentImageDocument.exists || !styleImageDocument.exists) {
-      res.status(400).send('One or both ids are invalid');
-      return;
+    if (!contentImageDocument.exists) {
+      throw new DocumentDoesNotExistException(
+        `The document with id ${contentImageDocument.id} does not exist`,
+        404
+      );
+    } else if (!styleImageDocument.exists) {
+      throw new DocumentDoesNotExistException(
+        `The document with id ${styleImageDocument.id} does not exist`,
+        404
+      );
     }
 
     const contentImageDocumentReference = contentImageDocument.ref;
@@ -80,7 +86,7 @@ export const createStylizedImage = async (
       populatedStyleImagePromise,
     ]);
 
-    let populatedStylizedImage: PopulatedStylizedImage | undefined
+    let populatedStylizedImage: PopulatedStylizedImage | undefined;
     if (querySnapshot.size > 0) {
       const stylizedImageDocument = querySnapshot.docs[0];
       populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
@@ -88,7 +94,7 @@ export const createStylizedImage = async (
         true
       );
 
-      res.status(200).send(populatedStylizedImage);
+      res.status(200).json(populatedStylizedImage);
       return;
     }
 
@@ -135,13 +141,9 @@ export const createStylizedImage = async (
       author: null,
     };
 
-    res.status(201).send(populatedStylizedImage);
-    return;
-  } catch (err) {
-    res.status(500).send(err);
-    return;
+    res.status(201).json(populatedStylizedImage);
   }
-};
+);
 
 const requestNstModel = async (
   contentImagePublicUrl: string,
@@ -220,11 +222,8 @@ const createStylizedImageDocument = async (stylizedImage: StylizedImage) => {
   return stylizedImageDocumentReference;
 };
 
-export const fetchAllStylizedImages = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const fetchAllStylizedImages = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const querySnapshot = await stylizedImagesCollection.get();
     const populatedStylizedImagesPromises = querySnapshot.docs.map(
       (stylizedImageDocument) =>
@@ -233,35 +232,26 @@ export const fetchAllStylizedImages = async (
     const populatedStylizedImages = await Promise.all(
       populatedStylizedImagesPromises
     );
-    res.status(200).send(populatedStylizedImages);
-  } catch (err) {
-    res.status(500).send(err);
+    res.status(200).json(populatedStylizedImages);
   }
-};
+);
 
-export const fetchOneStylizedImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  try {
+export const fetchOneStylizedImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
     const { id } = req.params;
     const stylizedImageDocument = await stylizedImagesCollection.doc(id).get();
     const populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
       stylizedImageDocument,
       true
     );
-    res.status(200).send(populatedStylizedImage);
-  } catch (err) {
-    res.status(500).send(err);
+    res.status(200).json(populatedStylizedImage);
   }
-};
+);
 
-export const deleteStylizedImage = async (
-  req: express.Request,
-  res: express.Response
-) => {
-  const { id } = req.params;
-  await stylizedImagesCollection.doc(id).delete();
-  res.status(200).send({ success: true });
-  return;
-};
+export const deleteStylizedImage = catchAsync(
+  async (req: express.Request, res: express.Response) => {
+    const { id } = req.params;
+    await stylizedImagesCollection.doc(id).delete();
+    res.status(200).json({ success: true });
+  }
+);
