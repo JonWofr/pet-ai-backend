@@ -1,6 +1,7 @@
-import * as express from 'express';
+// Models
 import { MultipartFormdataFile } from './multipart-formdata-file';
+import { TokenRequest } from './token-request';
 
-export interface MultipartFormdataRequest extends express.Request {
+export interface MultipartFormdataRequest extends TokenRequest {
   files: MultipartFormdataFile[];
 }

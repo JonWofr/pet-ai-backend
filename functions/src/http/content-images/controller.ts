@@ -28,13 +28,9 @@ export const contentImagesCollection = admin
   });
 
 export const createContentImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
-    const { name } = (req as MultipartFormdataRequest).body;
-    const {
-      filename,
-      mimetype,
-      buffer,
-    } = (req as MultipartFormdataRequest).files[0];
+  async (req: MultipartFormdataRequest, res: express.Response) => {
+    const { name } = req.body;
+    const { filename, mimetype, buffer } = req.files[0];
 
     const filePath = 'content-images/' + filename;
     const publicUrl = await uploadFileToGoogleCloudStorage(
@@ -53,11 +49,10 @@ export const createContentImage = catchAsync(
       timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
     };
     const imageDocumentReference = await createImageDocument(image);
-
     const contentImage: ContentImage = {
       image: imageDocumentReference,
       name,
-      author: null,
+      uid: 'dlksjfl',
     };
     const contentImageDocumentReference = await createContentImageDocument(
       contentImage
@@ -67,9 +62,8 @@ export const createContentImage = catchAsync(
       id: contentImageDocumentReference.id,
       ...contentImage,
       image,
-      author: null,
     };
-    res.status(201).send(populatedContentImage);
+    res.status(201).json(populatedContentImage);
   }
 );
 
@@ -92,7 +86,7 @@ export const fetchAllContentImages = catchAsync(
     const populatedContentImages = await Promise.all(
       populatedContentImagesPromises
     );
-    res.status(200).send(populatedContentImages);
+    res.status(200).json(populatedContentImages);
   }
 );
 
@@ -104,7 +98,7 @@ export const fetchOneContentImage = catchAsync(
       contentImageDocument,
       true
     );
-    res.status(200).send(populatedContentImage);
+    res.status(200).json(populatedContentImage);
   }
 );
 
@@ -138,7 +132,7 @@ export const deleteContentImage = catchAsync(
     const contentImage = contentImageDocument.data()!;
     await contentImage.image.delete();
 
-    res.status(200).send({ success: true });
+    res.status(200).json({ success: true });
     return;
   }
 );

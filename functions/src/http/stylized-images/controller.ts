@@ -126,7 +126,7 @@ export const createStylizedImage = catchAsync(
       styleImage: styleImageDocumentReference,
       image: imageDocumentReference,
       name,
-      author: null,
+      uid: null,
     };
     const stylizedImageDocumentReference = await createStylizedImageDocument(
       stylizedImage
@@ -138,7 +138,7 @@ export const createStylizedImage = catchAsync(
       contentImage: populatedContentImage,
       styleImage: populatedStyleImage,
       image,
-      author: null,
+      uid: null,
     };
 
     res.status(201).json(populatedStylizedImage);

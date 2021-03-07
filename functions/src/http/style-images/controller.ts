@@ -58,7 +58,7 @@ export const createStyleImage = catchAsync(
       image: imageDocumentReference,
       name,
       artist,
-      author: null,
+      uid: null,
     };
     const styleImageDocumentReference = await createStyleImageDocument(
       styleImage
@@ -68,7 +68,7 @@ export const createStyleImage = catchAsync(
       id: styleImageDocumentReference.id,
       ...styleImage,
       image,
-      author: null,
+      uid: null,
     };
     res.status(201).json(populatedStyleImage);
   }

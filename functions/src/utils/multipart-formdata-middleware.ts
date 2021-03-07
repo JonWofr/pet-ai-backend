@@ -5,8 +5,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-// Custom imports
+// Models
 import { MultipartFormdataFile } from '../models/multipart-formdata-file';
+import { MultipartFormdataRequest } from '../models/multipart-formdata-request';
 
 // Code copied from https://mikesukmanowsky.com/firebase-file-and-image-uploads/
 // Applied minor changes to comply to the ts compiler
@@ -68,7 +69,7 @@ export const upload = (
     Promise.all(fileWrites)
       .then(() => {
         req.body = fields;
-        (req as any).files = files;
+        (req as MultipartFormdataRequest).files = files;
         next();
       })
       .catch(next);
