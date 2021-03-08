@@ -1,24 +1,24 @@
-// 3rd party imports
 import * as express from 'express';
 import * as http from 'http';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as sizeOf from 'buffer-image-size';
-
-// Models
 import { StylizedImage } from '../../models/stylized-image';
 import { PopulatedStylizedImage } from '../../models/populated-stylized-image';
 import { PopulatedContentImage } from '../../models/populated-content-image';
 import { PopulatedStyleImage } from '../../models/populated-style-image';
 import { Image } from '../../models/image';
-
-// Custom imports
 import { contentImagesCollection } from '../content-images/controller';
 import { styleImagesCollection } from '../style-images/controller';
 import { createImageDocument } from '../images/controller';
-import { populateDocument } from '../../utils/database-helper';
+import {
+  checkDocument,
+  populateDocument,
+  processDocument,
+} from '../../utils/database-helper';
 import { catchAsync } from '../../utils/exception-handling-middleware';
-import { DocumentDoesNotExistException } from '../../utils/exceptions/document-does-not-exist-execption';
+import { makeHttpRequest } from '../../utils/http-helper';
+import { TokenRequest } from '../../models/token-request';
 
 interface NstModelResponse {
   predictions: { stylizedImagePublicUrl: string }[];
@@ -33,13 +33,14 @@ export const stylizedImagesCollection = admin
   .withConverter({
     toFirestore: (stylizedImage: StylizedImage) =>
       stylizedImage as admin.firestore.DocumentData,
-    fromFirestore: (documentData: admin.firestore.DocumentData) =>
-      documentData as StylizedImage,
+    fromFirestore: (document: admin.firestore.QueryDocumentSnapshot) =>
+      document.data() as StylizedImage,
   });
 
 export const createStylizedImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: TokenRequest, res: express.Response) => {
     const { contentImageId, styleImageId, name } = req.body;
+    const { uid } = req.token;
 
     const contentImageDocumentPromise = contentImagesCollection
       .doc(contentImageId)
@@ -53,17 +54,8 @@ export const createStylizedImage = catchAsync(
       styleImageDocumentPromise,
     ]);
 
-    if (!contentImageDocument.exists) {
-      throw new DocumentDoesNotExistException(
-        `The document with id ${contentImageDocument.id} does not exist`,
-        404
-      );
-    } else if (!styleImageDocument.exists) {
-      throw new DocumentDoesNotExistException(
-        `The document with id ${styleImageDocument.id} does not exist`,
-        404
-      );
-    }
+    checkDocument(contentImageDocument, uid);
+    checkDocument(styleImageDocument, uid);
 
     const contentImageDocumentReference = contentImageDocument.ref;
     const styleImageDocumentReference = styleImageDocument.ref;
@@ -74,11 +66,13 @@ export const createStylizedImage = catchAsync(
 
     const populatedContentImagePromise = populateDocument<PopulatedContentImage>(
       contentImageDocument,
-      false
+      false,
+      true
     );
     const populatedStyleImagePromise = populateDocument<PopulatedStyleImage>(
       styleImageDocument,
-      false
+      false,
+      true
     );
 
     const [populatedContentImage, populatedStyleImage] = await Promise.all([
@@ -89,9 +83,11 @@ export const createStylizedImage = catchAsync(
     let populatedStylizedImage: PopulatedStylizedImage | undefined;
     if (querySnapshot.size > 0) {
       const stylizedImageDocument = querySnapshot.docs[0];
-      populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
+      populatedStylizedImage = await processDocument<PopulatedStylizedImage>(
         stylizedImageDocument,
-        true
+        true,
+        true,
+        uid
       );
 
       res.status(200).json(populatedStylizedImage);
@@ -126,7 +122,7 @@ export const createStylizedImage = catchAsync(
       styleImage: styleImageDocumentReference,
       image: imageDocumentReference,
       name,
-      uid: null,
+      uid,
     };
     const stylizedImageDocumentReference = await createStylizedImageDocument(
       stylizedImage
@@ -138,7 +134,6 @@ export const createStylizedImage = catchAsync(
       contentImage: populatedContentImage,
       styleImage: populatedStyleImage,
       image,
-      uid: null,
     };
 
     res.status(201).json(populatedStylizedImage);
@@ -176,36 +171,6 @@ const requestNstModel = async (
   return stylizedImagePublicUrl;
 };
 
-// Makes an http request. Does only work for a response type of json.
-const makeHttpRequest = <T>(
-  requestOptions: http.RequestOptions,
-  body?: Object
-): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const request = http.request(requestOptions);
-
-    request.on('response', (response: http.IncomingMessage) => {
-      const chunks: Buffer[] = [];
-      response.on('data', (chunk: Buffer) => {
-        chunks.push(chunk);
-      });
-      response.on('end', () => {
-        resolve(JSON.parse(Buffer.concat(chunks).toString()));
-      });
-      // Error trying to receive the response
-      response.on('error', reject);
-    });
-
-    // Error trying to send the request
-    request.on('error', reject);
-
-    if (body) {
-      request.write(JSON.stringify(body));
-    }
-    request.end();
-  });
-};
-
 const getImagePath = (imagePublicUrl: string) => {
   const imagePublicUrlParts = imagePublicUrl.split('/');
   const bucketPartIndex = imagePublicUrlParts.indexOf(BUCKET_NAME);
@@ -223,11 +188,18 @@ const createStylizedImageDocument = async (stylizedImage: StylizedImage) => {
 };
 
 export const fetchAllStylizedImages = catchAsync(
-  async (req: express.Request, res: express.Response) => {
-    const querySnapshot = await stylizedImagesCollection.get();
+  async (req: TokenRequest, res: express.Response) => {
+    const { uid } = req.token;
+    const querySnapshot = await stylizedImagesCollection
+      .where('uid', 'in', [uid, null])
+      .get();
     const populatedStylizedImagesPromises = querySnapshot.docs.map(
       (stylizedImageDocument) =>
-        populateDocument<PopulatedStylizedImage>(stylizedImageDocument, true)
+        populateDocument<PopulatedStylizedImage>(
+          stylizedImageDocument,
+          true,
+          true
+        )
     );
     const populatedStylizedImages = await Promise.all(
       populatedStylizedImagesPromises
@@ -237,21 +209,28 @@ export const fetchAllStylizedImages = catchAsync(
 );
 
 export const fetchOneStylizedImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
+    const { uid } = req.token;
     const stylizedImageDocument = await stylizedImagesCollection.doc(id).get();
-    const populatedStylizedImage = await populateDocument<PopulatedStylizedImage>(
+    const populatedStylizedImage = await processDocument<PopulatedStylizedImage>(
       stylizedImageDocument,
-      true
+      true,
+      true,
+      uid
     );
     res.status(200).json(populatedStylizedImage);
   }
 );
 
 export const deleteStylizedImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    await stylizedImagesCollection.doc(id).delete();
+    const { uid } = req.token;
+    const stylizedImageDocumentReference = stylizedImagesCollection.doc(id);
+    const stylizedImageDocument = await stylizedImageDocumentReference.get();
+    checkDocument(stylizedImageDocument, uid);
+    await stylizedImageDocumentReference.delete();
     res.status(200).json({ success: true });
   }
 );

@@ -1,15 +1,10 @@
-// 3rd party imports
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-
-// Models
 import { Image } from '../../models/image';
 import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { MultipartFormdataFile } from '../../models/multipart-formdata-file';
 import { PopulatedImage } from '../../models/populated-image';
-
-// Custom imports
-import { populateDocument } from '../../utils/database-helper';
+import { populateDocument, processDocument } from '../../utils/database-helper';
 import { InvalidUploadException } from '../../utils/exceptions/invalid-upload-exception';
 import { catchAsync } from '../../utils/exception-handling-middleware';
 
@@ -22,8 +17,8 @@ export const imagesCollection = admin
   // Explicit Type declaration for all documents inside the collection 'images'
   .withConverter<Image>({
     toFirestore: (image: Image) => image as admin.firestore.DocumentData,
-    fromFirestore: (documentData: admin.firestore.DocumentData) =>
-      documentData as Image,
+    fromFirestore: (document: admin.firestore.QueryDocumentSnapshot) =>
+      document.data() as Image,
   });
 
 export const checkFile = (
@@ -96,23 +91,26 @@ export const createImageDocument = async (
   return documentReference;
 };
 
+// TODO This route should probably not exist in production mode anymore because user data can get accesses and currently there is no authorization check
 export const fetchAllImages = catchAsync(
   async (req: express.Request, res: express.Response) => {
     const querySnapshot = await imagesCollection.get();
     const populatedImagesPromises = querySnapshot.docs.map((imageDocument) =>
-      populateDocument<PopulatedImage>(imageDocument, true)
+      populateDocument<PopulatedImage>(imageDocument, true, true)
     );
     const populatedImages = await Promise.all(populatedImagesPromises);
     res.status(200).send(populatedImages);
   }
 );
 
+// TODO This route should probably not exist in production mode anymore because user data can get accesses and currently there is no authorization check
 export const fetchOneImage = catchAsync(
   async (req: express.Request, res: express.Response) => {
     const { id } = req.params;
     const imageDocument = await imagesCollection.doc(id).get();
     const populatedImage = await populateDocument<PopulatedImage>(
       imageDocument,
+      true,
       true
     );
     res.status(200).send(populatedImage);

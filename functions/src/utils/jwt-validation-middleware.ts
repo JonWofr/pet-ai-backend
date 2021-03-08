@@ -1,8 +1,5 @@
-// 3rd party imports
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-
-// Custom imports
 import { AuthenticationException } from './exceptions/authentication-exception';
 import { catchAsync } from '../utils/exception-handling-middleware';
 

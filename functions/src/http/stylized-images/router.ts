@@ -1,14 +1,17 @@
-// 3rd party imports
 import * as express from 'express';
-
-// Custom imports
-import { createStylizedImage, fetchAllStylizedImages, fetchOneStylizedImage, deleteStylizedImage } from './controller';
+import { validateToken } from '../../utils/jwt-validation-middleware';
+import {
+  createStylizedImage,
+  fetchAllStylizedImages,
+  fetchOneStylizedImage,
+  deleteStylizedImage,
+} from './controller';
 
 const router = express.Router();
 
-router.post('/', createStylizedImage);
-router.get('/', fetchAllStylizedImages)
-router.get('/:id', fetchOneStylizedImage)
-router.delete('/:id', deleteStylizedImage)
+router.post('/', validateToken, createStylizedImage);
+router.get('/', validateToken, fetchAllStylizedImages);
+router.get('/:id', validateToken, fetchOneStylizedImage);
+router.delete('/:id', validateToken, deleteStylizedImage);
 
 export default router;

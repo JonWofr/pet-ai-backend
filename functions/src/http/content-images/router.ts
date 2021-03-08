@@ -1,7 +1,4 @@
-// 3rd party imports
 import * as express from 'express';
-
-// Custom imports
 import {
   createContentImage,
   deleteContentImage,
@@ -15,8 +12,8 @@ import { validateToken } from '../../utils/jwt-validation-middleware';
 const router = express.Router();
 
 router.post('/', validateToken, upload, checkFile, createContentImage);
-router.get('/', fetchAllContentImages);
-router.get('/:id', fetchOneContentImage);
-router.delete('/:id', deleteContentImage);
+router.get('/', validateToken, fetchAllContentImages);
+router.get('/:id', validateToken, fetchOneContentImage);
+router.delete('/:id', validateToken, deleteContentImage);
 
 export default router;

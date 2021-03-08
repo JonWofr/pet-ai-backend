@@ -1,4 +1,3 @@
-// Custom imports
 import { PopulatedContentImage } from './populated-content-image';
 import { PopulatedImage } from './populated-image';
 import { PopulatedStyleImage } from './populated-style-image';

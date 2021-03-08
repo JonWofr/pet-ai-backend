@@ -1,4 +1,3 @@
-// 3rd party imports
 import * as express from 'express';
 import * as functions from 'firebase-functions';
 

@@ -1,11 +1,8 @@
-// 3rd party imports
 import * as Busboy from 'busboy';
 import * as express from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-
-// Models
 import { MultipartFormdataFile } from '../models/multipart-formdata-file';
 import { MultipartFormdataRequest } from '../models/multipart-formdata-request';
 

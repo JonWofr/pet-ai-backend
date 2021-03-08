@@ -1,4 +1,3 @@
-// Models
 import { MultipartFormdataFile } from './multipart-formdata-file';
 import { TokenRequest } from './token-request';
 

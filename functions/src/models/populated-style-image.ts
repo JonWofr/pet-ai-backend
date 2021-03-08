@@ -1,4 +1,3 @@
-// Models
 import { PopulatedImage } from './populated-image';
 
 export interface PopulatedStyleImage {
