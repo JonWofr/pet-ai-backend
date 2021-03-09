@@ -4,5 +4,5 @@ export interface PopulatedContentImage {
   id?: string;
   image: PopulatedImage;
   name: string;
-  uid: string | null;
+  userId: string | null;
 }

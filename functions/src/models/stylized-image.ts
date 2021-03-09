@@ -8,5 +8,5 @@ export interface StylizedImage {
   styleImage: admin.firestore.DocumentReference<StyleImage>;
   image: admin.firestore.DocumentReference<Image>;
   name: string;
-  uid: string | null;
+  userId: string | null;
 }

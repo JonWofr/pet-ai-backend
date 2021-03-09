@@ -10,7 +10,7 @@ const app = express();
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', functions.config().frontend.url);
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.header('Access-Control-Allow-Headers', ['Content-Type', 'Authorization']);
   console.log(new Date().toISOString(), req.method, req.originalUrl);
   next();
 });

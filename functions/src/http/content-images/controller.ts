@@ -30,7 +30,7 @@ export const createContentImage = catchAsync(
   async (req: MultipartFormdataRequest, res: express.Response) => {
     const { name } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
 
     const filePath = 'content-images/' + filename;
     const publicUrl = await uploadFileToGoogleCloudStorage(
@@ -52,7 +52,7 @@ export const createContentImage = catchAsync(
     const contentImage: ContentImage = {
       image: imageDocumentReference,
       name,
-      uid,
+      userId: userId,
     };
     const contentImageDocumentReference = await createContentImageDocument(
       contentImage
@@ -78,9 +78,9 @@ const createContentImageDocument = async (
 
 export const fetchAllContentImages = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const querySnapshot = await contentImagesCollection
-      .where('uid', 'in', [uid, null])
+      .where('userId', 'in', [userId, null])
       .get();
     const populatedContentImagesPromises = querySnapshot.docs.map(
       (contentImageDocument) =>
@@ -100,13 +100,13 @@ export const fetchAllContentImages = catchAsync(
 export const fetchOneContentImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const contentImageDocument = await contentImagesCollection.doc(id).get();
     const populatedContentImage = await processDocument<PopulatedContentImage>(
       contentImageDocument,
       true,
       true,
-      uid
+      userId
     );
     res.status(200).json(populatedContentImage);
   }
@@ -115,10 +115,10 @@ export const fetchOneContentImage = catchAsync(
 export const deleteContentImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const contentImageDocumentReference = contentImagesCollection.doc(id);
     const contentImageDocument = await contentImageDocumentReference.get();
-    checkDocument(contentImageDocument, uid);
+    checkDocument(contentImageDocument, userId);
 
     // Delete all stylized image documents that reference this one
     const stylizedImageQuerySnaphot = await stylizedImagesCollection
