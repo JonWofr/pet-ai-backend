@@ -40,7 +40,7 @@ export const stylizedImagesCollection = admin
 export const createStylizedImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { contentImageId, styleImageId, name } = req.body;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
 
     const contentImageDocumentPromise = contentImagesCollection
       .doc(contentImageId)
@@ -54,8 +54,8 @@ export const createStylizedImage = catchAsync(
       styleImageDocumentPromise,
     ]);
 
-    checkDocument(contentImageDocument, uid);
-    checkDocument(styleImageDocument, uid);
+    checkDocument(contentImageDocument, userId);
+    checkDocument(styleImageDocument, userId);
 
     const contentImageDocumentReference = contentImageDocument.ref;
     const styleImageDocumentReference = styleImageDocument.ref;
@@ -87,7 +87,7 @@ export const createStylizedImage = catchAsync(
         stylizedImageDocument,
         true,
         true,
-        uid
+        userId
       );
 
       res.status(200).json(populatedStylizedImage);
@@ -122,7 +122,7 @@ export const createStylizedImage = catchAsync(
       styleImage: styleImageDocumentReference,
       image: imageDocumentReference,
       name,
-      uid,
+      userId,
     };
     const stylizedImageDocumentReference = await createStylizedImageDocument(
       stylizedImage
@@ -189,9 +189,9 @@ const createStylizedImageDocument = async (stylizedImage: StylizedImage) => {
 
 export const fetchAllStylizedImages = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const querySnapshot = await stylizedImagesCollection
-      .where('uid', 'in', [uid, null])
+      .where('userId', 'in', [userId, null])
       .get();
     const populatedStylizedImagesPromises = querySnapshot.docs.map(
       (stylizedImageDocument) =>
@@ -211,13 +211,13 @@ export const fetchAllStylizedImages = catchAsync(
 export const fetchOneStylizedImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const stylizedImageDocument = await stylizedImagesCollection.doc(id).get();
     const populatedStylizedImage = await processDocument<PopulatedStylizedImage>(
       stylizedImageDocument,
       true,
       true,
-      uid
+      userId
     );
     res.status(200).json(populatedStylizedImage);
   }
@@ -226,10 +226,10 @@ export const fetchOneStylizedImage = catchAsync(
 export const deleteStylizedImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const stylizedImageDocumentReference = stylizedImagesCollection.doc(id);
     const stylizedImageDocument = await stylizedImageDocumentReference.get();
-    checkDocument(stylizedImageDocument, uid);
+    checkDocument(stylizedImageDocument, userId);
     await stylizedImageDocumentReference.delete();
     res.status(200).json({ success: true });
   }

@@ -30,7 +30,7 @@ export const createStyleImage = catchAsync(
   async (req: MultipartFormdataRequest, res: express.Response) => {
     const { name, artist } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
 
     const filePath = 'style-images/' + filename;
     const publicUrl = await uploadFileToGoogleCloudStorage(
@@ -54,7 +54,7 @@ export const createStyleImage = catchAsync(
       image: imageDocumentReference,
       name,
       artist,
-      uid,
+      userId,
     };
     const styleImageDocumentReference = await createStyleImageDocument(
       styleImage
@@ -80,9 +80,9 @@ const createStyleImageDocument = async (
 
 export const fetchAllStyleImages = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const querySnapshot = await styleImagesCollection
-      .where('uid', 'in', [uid, null])
+      .where('userId', 'in', [userId, null])
       .get();
     const populatedStyleImagesPromises = querySnapshot.docs.map(
       (styleImageDocument) =>
@@ -98,13 +98,13 @@ export const fetchAllStyleImages = catchAsync(
 export const fetchOneStyleImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const styleImageDocument = await styleImagesCollection.doc(id).get();
     const populatedStyleImage = await processDocument<PopulatedStyleImage>(
       styleImageDocument,
       true,
       true,
-      uid
+      userId
     );
     res.status(200).json(populatedStyleImage);
   }
@@ -113,10 +113,10 @@ export const fetchOneStyleImage = catchAsync(
 export const deleteStyleImage = catchAsync(
   async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
-    const { uid } = req.token;
+    const { uid: userId } = req.token;
     const styleImageDocumentReference = styleImagesCollection.doc(id);
     const styleImageDocument = await styleImageDocumentReference.get();
-    checkDocument(styleImageDocument, uid);
+    checkDocument(styleImageDocument, userId);
 
     // Delete all stylized image documents that reference this one
     const stylizedImageQuerySnaphot = await stylizedImagesCollection

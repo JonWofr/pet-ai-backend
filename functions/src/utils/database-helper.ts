@@ -6,9 +6,9 @@ export const processDocument = async <T>(
   document: admin.firestore.DocumentSnapshot,
   shouldAddId = true,
   shouldPopulate = true,
-  uid?: string
+  userId?: string
 ): Promise<T> => {
-  checkDocument(document, uid);
+  checkDocument(document, userId);
   const documentData = await populateDocument<T>(
     document,
     shouldAddId,
@@ -19,7 +19,7 @@ export const processDocument = async <T>(
 
 export const checkDocument = (
   document: admin.firestore.DocumentSnapshot,
-  uid?: string
+  userId?: string
 ) => {
   if (!document.exists) {
     throw new DocumentDoesNotExistException(
@@ -28,7 +28,7 @@ export const checkDocument = (
     );
   }
   const documentData = document.data()!;
-  if (uid && uid !== documentData.uid) {
+  if (userId && userId !== documentData.userId) {
     throw new AuthorizationException(
       `You are not allowed to read, write or delete document with id ${document.id}`,
       403

@@ -8,5 +8,5 @@ export interface PopulatedStylizedImage {
   styleImage: PopulatedStyleImage;
   image: PopulatedImage;
   name: string;
-  uid: string | null;
+  userId: string | null;
 }
