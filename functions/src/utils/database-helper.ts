@@ -1,29 +1,54 @@
-// 3rd party imports
 import * as admin from 'firebase-admin';
-
-// Custom imports
 import { DocumentDoesNotExistException } from '../utils/exceptions/document-does-not-exist-execption';
+import { AuthorizationException } from './exceptions/authorization-exception';
 
-export const populateDocument = async <T>(
+export const processDocument = async <T>(
   document: admin.firestore.DocumentSnapshot,
-  shouldAddId = true
+  shouldAddId = true,
+  shouldPopulate = true,
+  uid?: string
 ): Promise<T> => {
+  checkDocument(document, uid);
+  const documentData = await populateDocument<T>(
+    document,
+    shouldAddId,
+    shouldPopulate
+  );
+  return documentData;
+};
+
+export const checkDocument = (
+  document: admin.firestore.DocumentSnapshot,
+  uid?: string
+) => {
   if (!document.exists) {
     throw new DocumentDoesNotExistException(
       `The document with id ${document.id} does not exist`,
       404
     );
   }
-
-  const populatedDocument = await recursivelyResolveReferences(
-    document.data()!
-  );
-
-  if (shouldAddId) {
-    populatedDocument.id = document.id;
+  const documentData = document.data()!;
+  if (uid && uid !== documentData.uid) {
+    throw new AuthorizationException(
+      `You are not allowed to read, write or delete document with id ${document.id}`,
+      403
+    );
   }
+};
 
-  return populatedDocument;
+export const populateDocument = async <T>(
+  document: admin.firestore.DocumentSnapshot,
+  shouldAddId = true,
+  shouldPopulate = true
+): Promise<T> => {
+  let documentData = document.data()! as any;
+  if (shouldPopulate) {
+    documentData = await recursivelyResolveReferences(documentData);
+  }
+  if (shouldAddId) {
+    documentData.id = document.id;
+  }
+  return documentData;
 };
 
 const recursivelyResolveReferences = async (

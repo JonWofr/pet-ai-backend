@@ -1,8 +1,5 @@
-// 3rd party imports
 import * as express from 'express';
 import * as functions from 'firebase-functions';
-
-// Custom imports
 import imageRouter from './images/router';
 import contentImageRouter from './content-images/router';
 import styleImageRouter from './style-images/router';

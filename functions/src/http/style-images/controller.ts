@@ -1,21 +1,20 @@
-// 3rd party imports
 import * as sizeOf from 'buffer-image-size';
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-
-// Custom imports
 import { createImageDocument } from '../images/controller';
-import { populateDocument } from '../../utils/database-helper';
+import {
+  checkDocument,
+  populateDocument,
+  processDocument,
+} from '../../utils/database-helper';
 import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
 import { catchAsync } from '../../utils/exception-handling-middleware';
-
-// Models
 import { StyleImage } from '../../models/style-image';
 import { Image } from '../../models/image';
 import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { PopulatedStyleImage } from '../../models/populated-style-image';
 import { stylizedImagesCollection } from '../stylized-images/controller';
-import { DocumentDoesNotExistException } from '../../utils/exceptions/document-does-not-exist-execption';
+import { TokenRequest } from '../../models/token-request';
 
 export const styleImagesCollection = admin
   .firestore()
@@ -23,18 +22,15 @@ export const styleImagesCollection = admin
   .withConverter({
     toFirestore: (styleImage: StyleImage) =>
       styleImage as admin.firestore.DocumentData,
-    fromFirestore: (documentData: admin.firestore.DocumentData) =>
-      documentData as StyleImage,
+    fromFirestore: (document: admin.firestore.QueryDocumentSnapshot) =>
+      document.data() as StyleImage,
   });
 
 export const createStyleImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: MultipartFormdataRequest, res: express.Response) => {
     const { name, artist } = req.body;
-    const {
-      filename,
-      mimetype,
-      buffer,
-    } = (req as MultipartFormdataRequest).files[0];
+    const { filename, mimetype, buffer } = req.files[0];
+    const { uid } = req.token;
 
     const filePath = 'style-images/' + filename;
     const publicUrl = await uploadFileToGoogleCloudStorage(
@@ -58,7 +54,7 @@ export const createStyleImage = catchAsync(
       image: imageDocumentReference,
       name,
       artist,
-      author: null,
+      uid,
     };
     const styleImageDocumentReference = await createStyleImageDocument(
       styleImage
@@ -68,7 +64,6 @@ export const createStyleImage = catchAsync(
       id: styleImageDocumentReference.id,
       ...styleImage,
       image,
-      author: null,
     };
     res.status(201).json(populatedStyleImage);
   }
@@ -84,11 +79,14 @@ const createStyleImageDocument = async (
 };
 
 export const fetchAllStyleImages = catchAsync(
-  async (req: express.Request, res: express.Response) => {
-    const querySnapshot = await styleImagesCollection.get();
+  async (req: TokenRequest, res: express.Response) => {
+    const { uid } = req.token;
+    const querySnapshot = await styleImagesCollection
+      .where('uid', 'in', [uid, null])
+      .get();
     const populatedStyleImagesPromises = querySnapshot.docs.map(
       (styleImageDocument) =>
-        populateDocument<PopulatedStyleImage>(styleImageDocument, true)
+        populateDocument<PopulatedStyleImage>(styleImageDocument, true, true)
     );
     const populatedStyleImages = await Promise.all(
       populatedStyleImagesPromises
@@ -98,29 +96,27 @@ export const fetchAllStyleImages = catchAsync(
 );
 
 export const fetchOneStyleImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
+    const { uid } = req.token;
     const styleImageDocument = await styleImagesCollection.doc(id).get();
-    const populatedStyleImage = await populateDocument<PopulatedStyleImage>(
+    const populatedStyleImage = await processDocument<PopulatedStyleImage>(
       styleImageDocument,
-      true
+      true,
+      true,
+      uid
     );
     res.status(200).json(populatedStyleImage);
   }
 );
 
 export const deleteStyleImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async (req: TokenRequest, res: express.Response) => {
     const { id } = req.params;
+    const { uid } = req.token;
     const styleImageDocumentReference = styleImagesCollection.doc(id);
     const styleImageDocument = await styleImageDocumentReference.get();
-
-    if (!styleImageDocument.exists) {
-      throw new DocumentDoesNotExistException(
-        `The document with id ${styleImageDocument.id} does not exist`,
-        404
-      );
-    }
+    checkDocument(styleImageDocument, uid);
 
     // Delete all stylized image documents that reference this one
     const stylizedImageQuerySnaphot = await stylizedImagesCollection

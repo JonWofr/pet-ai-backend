@@ -1,4 +1,3 @@
-// 3rd party imports
 import * as express from 'express';
 import * as functions from 'firebase-functions';
 
@@ -44,11 +43,7 @@ const handleExceptionProd = (err: any, res: express.Response) => {
 };
 
 export const catchAsync = (
-  fn: (
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => Promise<void>
+  fn: (req: any, res: any, next: any) => Promise<void>
 ) => {
   return (
     req: express.Request,
