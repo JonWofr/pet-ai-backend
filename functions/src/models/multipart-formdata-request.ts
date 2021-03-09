@@ -1,6 +1,8 @@
 import { MultipartFormdataFile } from './multipart-formdata-file';
-import { TokenRequest } from './token-request';
+import * as admin from 'firebase-admin';
+import * as express from 'express';
 
-export interface MultipartFormdataRequest extends TokenRequest {
+export interface MultipartFormdataRequest extends express.Request {
   files: MultipartFormdataFile[];
+  token?: admin.auth.DecodedIdToken;
 }

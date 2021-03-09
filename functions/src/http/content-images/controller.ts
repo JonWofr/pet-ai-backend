@@ -12,9 +12,9 @@ import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
 import { catchAsync } from '../../utils/exception-handling-middleware';
 import { Image } from '../../models/image';
 import { ContentImage } from '../../models/content-image';
-import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { PopulatedContentImage } from '../../models/populated-content-image';
 import { TokenRequest } from '../../models/token-request';
+import { MultipartFormdataTokenRequest } from '../../models/multipart-formdata-token-request';
 
 export const contentImagesCollection = admin
   .firestore()
@@ -27,7 +27,7 @@ export const contentImagesCollection = admin
   });
 
 export const createContentImage = catchAsync(
-  async (req: MultipartFormdataRequest, res: express.Response) => {
+  async (req: MultipartFormdataTokenRequest, res: express.Response) => {
     const { name } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
     const { uid: userId } = req.token;

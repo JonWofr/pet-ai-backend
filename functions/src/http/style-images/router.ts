@@ -7,13 +7,12 @@ import {
 } from './controller';
 import { checkFile } from '../images/controller';
 import { upload } from '../../utils/multipart-formdata-middleware';
-import { validateToken } from '../../utils/jwt-validation-middleware';
 
 const router = express.Router();
 
-router.post('/', validateToken, upload, checkFile, createStyleImage);
-router.get('/', validateToken, fetchAllStyleImages);
-router.get('/:id', validateToken, fetchOneStyleImage);
-router.delete('/:id', validateToken, deleteStyleImage);
+router.post('/', upload, checkFile, createStyleImage);
+router.get('/', fetchAllStyleImages);
+router.get('/:id', fetchOneStyleImage);
+router.delete('/:id', deleteStyleImage);
 
 export default router;
