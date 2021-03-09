@@ -5,5 +5,4 @@ export interface StyleImage {
   image: admin.firestore.DocumentReference<Image>;
   name: string;
   artist: string;
-  userId: string | null;
 }

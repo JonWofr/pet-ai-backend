@@ -5,5 +5,4 @@ export interface PopulatedStyleImage {
   image: PopulatedImage;
   name: string;
   artist: string;
-  userId: string | null;
 }
