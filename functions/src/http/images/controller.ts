@@ -4,7 +4,7 @@ import { Image } from '../../models/image';
 import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { MultipartFormdataFile } from '../../models/multipart-formdata-file';
 import { PopulatedImage } from '../../models/populated-image';
-import { populateDocument, processDocument } from '../../utils/database-helper';
+import { populateDocument } from '../../utils/database-helper';
 import { InvalidUploadException } from '../../utils/exceptions/invalid-upload-exception';
 import { catchAsync } from '../../utils/exception-handling-middleware';
 

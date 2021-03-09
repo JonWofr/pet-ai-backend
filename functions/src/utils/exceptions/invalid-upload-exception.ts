@@ -5,6 +5,6 @@ export class InvalidUploadException extends HttpException {
   constructor(message: string, statusCode: number) {
     super(message, statusCode);
 
-    this.name = 'DocumentDoesNotExistException';
+    this.name = 'InvalidUploadException';
   }
 }

@@ -96,7 +96,7 @@ export const createStylizedImage = catchAsync(
 
     const stylizedImagePublicUrl = await requestNstModel(
       populatedContentImage.image.publicUrl,
-      populatedStyleImage.image.publicUrl
+      populatedStyleImage.name
     );
 
     const stylizedImagePath = getImagePath(stylizedImagePublicUrl);
@@ -142,7 +142,7 @@ export const createStylizedImage = catchAsync(
 
 const requestNstModel = async (
   contentImagePublicUrl: string,
-  styleImagePublicUrl: string
+  styleImageName: string
 ) => {
   const nstModelRequestOptions: http.RequestOptions = {
     method: 'POST',
@@ -158,7 +158,7 @@ const requestNstModel = async (
     instances: [
       {
         contentImagePublicUrl,
-        styleImagePublicUrl,
+        styleImageName,
       },
     ],
   };
