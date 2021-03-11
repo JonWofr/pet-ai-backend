@@ -1,4 +1,4 @@
-export interface MultipartFormdataFile {
+export interface FormDataFile {
   fieldname: string;
   filename: string;
   encoding: string;

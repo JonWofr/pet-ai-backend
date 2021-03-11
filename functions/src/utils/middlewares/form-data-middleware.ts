@@ -3,13 +3,13 @@ import * as express from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { MultipartFormdataFile } from '../models/multipart-formdata-file';
-import { MultipartFormdataRequest } from '../models/multipart-formdata-request';
+import { FormDataFile } from '../../models/form-data-file';
+import { FormDataRequest } from '../../models/form-data-request';
 
 // Code copied from https://mikesukmanowsky.com/firebase-file-and-image-uploads/
 // Applied minor changes to comply to the ts compiler
 
-export const upload = (
+export const uploadFormData = (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
@@ -17,7 +17,7 @@ export const upload = (
   const busboy = new Busboy({ headers: req.headers });
 
   const fields: { [fieldname: string]: any } = {};
-  const files: MultipartFormdataFile[] = [];
+  const files: FormDataFile[] = [];
   const fileWrites: Promise<void>[] = [];
   const tmpdir = os.tmpdir();
 
@@ -66,7 +66,7 @@ export const upload = (
     Promise.all(fileWrites)
       .then(() => {
         req.body = fields;
-        (req as MultipartFormdataRequest).files = files;
+        (req as FormDataRequest).files = files;
         next();
       })
       .catch(next);

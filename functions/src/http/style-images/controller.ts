@@ -1,32 +1,28 @@
 import * as sizeOf from 'buffer-image-size';
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-import { createImageDocument } from '../images/controller';
-import {
-  checkDocument,
-  populateDocument,
-  processDocument,
-} from '../../utils/database-helper';
-import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
-import { catchAsync } from '../../utils/exception-handling-middleware';
+import { ImageController } from '../images/controller';
+import { uploadFileToGoogleCloudStorage } from '../../utils/helpers/storage-helper';
 import { StyleImage } from '../../models/style-image';
 import { Image } from '../../models/image';
-import { MultipartFormdataRequest } from '../../models/multipart-formdata-request';
 import { PopulatedStyleImage } from '../../models/populated-style-image';
-import { stylizedImagesCollection } from '../stylized-images/controller';
+import { StylizedImageController } from '../stylized-images/controller';
+import { DatabaseHelper } from '../../utils/helpers/database-helper';
+import { FormDataTokenRequest } from '../../models/form-data-token-request';
+import { TokenRequest } from '../../models/token-request';
 
-export const styleImagesCollection = admin
-  .firestore()
-  .collection('style-images')
-  .withConverter({
-    toFirestore: (styleImage: StyleImage) =>
-      styleImage as admin.firestore.DocumentData,
-    fromFirestore: (document: admin.firestore.QueryDocumentSnapshot) =>
-      document.data() as StyleImage,
-  });
+export class StyleImageController extends DatabaseHelper<
+  StyleImage,
+  PopulatedStyleImage
+> {
+  constructor() {
+    super('style-images');
+  }
 
-export const createStyleImage = catchAsync(
-  async (req: MultipartFormdataRequest, res: express.Response) => {
+  async createOneStyleImage(
+    req: FormDataTokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { name, artist } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
 
@@ -46,16 +42,15 @@ export const createStyleImage = catchAsync(
       size: buffer.length,
       timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
     };
-    const imageDocumentReference = await createImageDocument(image);
+    const imageController = new ImageController();
+    const imageDocumentReference = await imageController.createOne(image);
 
     const styleImage: StyleImage = {
       image: imageDocumentReference,
       name,
       artist,
     };
-    const styleImageDocumentReference = await createStyleImageDocument(
-      styleImage
-    );
+    const styleImageDocumentReference = await this.createOne(styleImage);
 
     const populatedStyleImage: PopulatedStyleImage = {
       id: styleImageDocumentReference.id,
@@ -64,58 +59,40 @@ export const createStyleImage = catchAsync(
     };
     res.status(201).json(populatedStyleImage);
   }
-);
 
-const createStyleImageDocument = async (
-  styleImage: StyleImage
-): Promise<admin.firestore.DocumentReference<StyleImage>> => {
-  const styleImageDocumentReference = await styleImagesCollection.add(
-    styleImage
-  );
-  return styleImageDocumentReference;
-};
-
-export const fetchAllStyleImages = catchAsync(
-  async (req: express.Request, res: express.Response) => {
-    const querySnapshot = await styleImagesCollection.get();
-    const populatedStyleImagesPromises = querySnapshot.docs.map(
-      (styleImageDocument) =>
-        populateDocument<PopulatedStyleImage>(styleImageDocument, true, true)
-    );
-    const populatedStyleImages = await Promise.all(
-      populatedStyleImagesPromises
-    );
-    res.status(200).json(populatedStyleImages);
-  }
-);
-
-export const fetchOneStyleImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async fetchOneStyleImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { id } = req.params;
-    const styleImageDocument = await styleImagesCollection.doc(id).get();
-    const populatedStyleImage = await processDocument<PopulatedStyleImage>(
-      styleImageDocument,
-      true,
-      true
-    );
-    res.status(200).json(populatedStyleImage);
+    const populatedContentImage = await this.fetchOne(id);
+    res.status(200).json(populatedContentImage);
   }
-);
 
-export const deleteStyleImage = catchAsync(
-  async (req: express.Request, res: express.Response) => {
+  async fetchAllStyleImages(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
+    const populatedContentImage = await this.fetchAll();
+    res.status(200).json(populatedContentImage);
+  }
+
+  async deleteOneStyleImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { id } = req.params;
-    const styleImageDocumentReference = styleImagesCollection.doc(id);
+    const styleImageDocumentReference = this.collection.doc(id);
     const styleImageDocument = await styleImageDocumentReference.get();
-    checkDocument(styleImageDocument);
+    this.checkDocumentExistence(styleImageDocument);
 
     // Delete all stylized image documents that reference this one
-    const stylizedImageQuerySnaphot = await stylizedImagesCollection
+    const stylizedImageController = new StylizedImageController();
+    const stylizedImageQuerySnaphot = await stylizedImageController.collection
       .where('styleImage', '==', styleImageDocumentReference)
       .get();
     const stylizedImageDeletionsPromises = stylizedImageQuerySnaphot.docs.map(
-      (stylizedImageDocument) =>
-        stylizedImagesCollection.doc(stylizedImageDocument.id).delete()
+      (stylizedImageDocument) => stylizedImageDocument.ref.delete()
     );
     await Promise.all(stylizedImageDeletionsPromises);
 
@@ -128,4 +105,4 @@ export const deleteStyleImage = catchAsync(
 
     res.status(200).json({ success: true });
   }
-);
+}

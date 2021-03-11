@@ -1,38 +1,34 @@
 import * as express from 'express';
 import * as sizeOf from 'buffer-image-size';
 import * as admin from 'firebase-admin';
-import { createImageDocument } from '../images/controller';
-import {
-  checkDocument,
-  populateDocument,
-  processDocument,
-} from '../../utils/database-helper';
-import { stylizedImagesCollection } from '../stylized-images/controller';
-import { uploadFileToGoogleCloudStorage } from '../../utils/storage-helper';
-import { catchAsync } from '../../utils/exception-handling-middleware';
+import { ImageController } from '../images/controller';
+import { StylizedImageController } from '../stylized-images/controller';
+import { uploadFileToGoogleCloudStorage } from '../../utils/helpers/storage-helper';
 import { Image } from '../../models/image';
 import { ContentImage } from '../../models/content-image';
 import { PopulatedContentImage } from '../../models/populated-content-image';
 import { TokenRequest } from '../../models/token-request';
-import { MultipartFormdataTokenRequest } from '../../models/multipart-formdata-token-request';
+import { FormDataTokenRequest } from '../../models/form-data-token-request';
+import { DatabaseHelper } from '../../utils/helpers/database-helper';
+import { UserRole } from '../../enums/user-role.enum';
 
-export const contentImagesCollection = admin
-  .firestore()
-  .collection('content-images')
-  .withConverter({
-    toFirestore: (contentImage: ContentImage) =>
-      contentImage as admin.firestore.DocumentData,
-    fromFirestore: (document: admin.firestore.QueryDocumentSnapshot) =>
-      document.data() as ContentImage,
-  });
+export class ContentImageController extends DatabaseHelper<
+  ContentImage,
+  PopulatedContentImage
+> {
+  constructor() {
+    super('content-images');
+  }
 
-export const createContentImage = catchAsync(
-  async (req: MultipartFormdataTokenRequest, res: express.Response) => {
+  async createOneContentImage(
+    req: FormDataTokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { name } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
-    const { uid: userId } = req.token;
+    const { uid: userId, role: userRole = UserRole.User } = req.token;
 
-    const filePath = 'content-images/' + filename;
+    const filePath = `content-images/${filename}`;
     const publicUrl = await uploadFileToGoogleCloudStorage(
       filePath,
       mimetype,
@@ -48,15 +44,14 @@ export const createContentImage = catchAsync(
       size: buffer.length,
       timestamp: admin.firestore.Timestamp.fromMillis(Date.now()),
     };
-    const imageDocumentReference = await createImageDocument(image);
+    const imageController = new ImageController();
+    const imageDocumentReference = await imageController.createOne(image);
     const contentImage: ContentImage = {
       image: imageDocumentReference,
       name,
-      userId: userId,
+      userId: userRole === UserRole.Admin ? '' : userId,
     };
-    const contentImageDocumentReference = await createContentImageDocument(
-      contentImage
-    );
+    const contentImageDocumentReference = await this.createOne(contentImage);
 
     const populatedContentImage: PopulatedContentImage = {
       id: contentImageDocumentReference.id,
@@ -65,68 +60,43 @@ export const createContentImage = catchAsync(
     };
     res.status(201).json(populatedContentImage);
   }
-);
 
-const createContentImageDocument = async (
-  contentImage: ContentImage
-): Promise<admin.firestore.DocumentReference<ContentImage>> => {
-  const contentImageDocumentReference = await contentImagesCollection.add(
-    contentImage
-  );
-  return contentImageDocumentReference;
-};
-
-export const fetchAllContentImages = catchAsync(
-  async (req: TokenRequest, res: express.Response) => {
-    const { uid: userId } = req.token;
-    const querySnapshot = await contentImagesCollection
-      .where('userId', 'in', [userId, null])
-      .get();
-    const populatedContentImagesPromises = querySnapshot.docs.map(
-      (contentImageDocument) =>
-        populateDocument<PopulatedContentImage>(
-          contentImageDocument,
-          true,
-          true
-        )
-    );
-    const populatedContentImages = await Promise.all(
-      populatedContentImagesPromises
-    );
-    res.status(200).json(populatedContentImages);
-  }
-);
-
-export const fetchOneContentImage = catchAsync(
-  async (req: TokenRequest, res: express.Response) => {
+  async fetchOneContentImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { id } = req.params;
-    const { uid: userId } = req.token;
-    const contentImageDocument = await contentImagesCollection.doc(id).get();
-    const populatedContentImage = await processDocument<PopulatedContentImage>(
-      contentImageDocument,
-      true,
-      true,
-      userId
-    );
+    const { uid: userId, role: userRole = UserRole.User } = req.token;
+    const populatedContentImage = await this.fetchOne(id, userId, userRole);
     res.status(200).json(populatedContentImage);
   }
-);
 
-export const deleteContentImage = catchAsync(
-  async (req: TokenRequest, res: express.Response) => {
+  async fetchAllContentImages(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
+    const { uid: userId, role: userRole = UserRole.User } = req.token;
+    const populatedContentImage = await this.fetchAll(userId, userRole);
+    res.status(200).json(populatedContentImage);
+  }
+
+  async deleteOneContentImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
     const { id } = req.params;
-    const { uid: userId } = req.token;
-    const contentImageDocumentReference = contentImagesCollection.doc(id);
+
+    const contentImageDocumentReference = this.collection.doc(id);
     const contentImageDocument = await contentImageDocumentReference.get();
-    checkDocument(contentImageDocument, userId);
+    this.checkDocumentExistence(contentImageDocument);
 
     // Delete all stylized image documents that reference this one
-    const stylizedImageQuerySnaphot = await stylizedImagesCollection
+    const stylizedImageController = new StylizedImageController();
+    const stylizedImageQuerySnaphot = await stylizedImageController.collection
       .where('contentImage', '==', contentImageDocumentReference)
       .get();
     const stylizedImageDeletionsPromises = stylizedImageQuerySnaphot.docs.map(
-      (stylizedImageDocument) =>
-        stylizedImagesCollection.doc(stylizedImageDocument.id).delete()
+      (stylizedImageDocument) => stylizedImageDocument.ref.delete()
     );
     await Promise.all(stylizedImageDeletionsPromises);
 
@@ -138,6 +108,5 @@ export const deleteContentImage = catchAsync(
     await contentImage.image.delete();
 
     res.status(200).json({ success: true });
-    return;
   }
-);
+}

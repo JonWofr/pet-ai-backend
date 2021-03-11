@@ -69,3 +69,6 @@ gcp-credentials.json
 
 # IDE files
 .vscode/
+
+# Emulator data
+firestore-emulator-data

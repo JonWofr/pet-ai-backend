@@ -4,7 +4,7 @@ import imageRouter from './images/router';
 import contentImageRouter from './content-images/router';
 import styleImageRouter from './style-images/router';
 import stylizedImagesRouter from './stylized-images/router';
-import { handleException } from '../utils/exception-handling-middleware';
+import { handleException } from '../utils/middlewares/exception-handling-middleware';
 
 const app = express();
 
