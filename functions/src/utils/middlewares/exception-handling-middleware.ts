@@ -43,13 +43,13 @@ const handleExceptionProd = (err: any, res: express.Response) => {
 };
 
 export const catchAsync = (
-  fn: (req: any, res: any, next: any) => Promise<void>
+  asyncFunction: (req: any, res: any, next: any) => Promise<void>
 ) => {
   return (
     req: express.Request,
     res: express.Response,
     next: express.NextFunction
   ) => {
-    fn(req, res, next).catch(next);
+    asyncFunction(req, res, next).catch(next);
   };
 };
