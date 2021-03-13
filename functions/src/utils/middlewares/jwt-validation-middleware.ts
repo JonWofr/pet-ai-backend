@@ -2,7 +2,7 @@ import * as express from 'express';
 import * as admin from 'firebase-admin';
 import { AuthenticationException } from '../exceptions/authentication-exception';
 import { catchAsync } from './exception-handling-middleware';
-import { TokenRequest } from '../../models/token-request';
+import { TokenRequest } from '../../models/token-request.model';
 
 export const checkToken = catchAsync(
   async (

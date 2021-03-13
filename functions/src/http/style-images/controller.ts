@@ -3,13 +3,13 @@ import * as express from 'express';
 import * as admin from 'firebase-admin';
 import { ImageController } from '../images/controller';
 import { uploadFileToGoogleCloudStorage } from '../../utils/helpers/storage-helper';
-import { StyleImage } from '../../models/style-image';
-import { Image } from '../../models/image';
-import { PopulatedStyleImage } from '../../models/populated-style-image';
+import { StyleImage } from '../../models/style-image.model';
+import { Image } from '../../models/image.model';
+import { PopulatedStyleImage } from '../../models/populated-style-image.model';
 import { StylizedImageController } from '../stylized-images/controller';
 import { DatabaseHelper } from '../../utils/helpers/database-helper';
-import { FormDataTokenRequest } from '../../models/form-data-token-request';
-import { TokenRequest } from '../../models/token-request';
+import { FormDataTokenRequest } from '../../models/form-data-token-request.model';
+import { TokenRequest } from '../../models/token-request.model';
 
 export class StyleImageController extends DatabaseHelper<
   StyleImage,

@@ -74,9 +74,7 @@ export abstract class DatabaseHelper<DocumentData, PopulatedDocumentData> {
     await documentReference.delete();
   }
 
-  checkDocumentExistence(
-    document: admin.firestore.DocumentSnapshot<DocumentData>
-  ): void {
+  checkDocumentExistence(document: admin.firestore.DocumentSnapshot): void {
     if (!document.exists) {
       throw new DocumentDoesNotExistException(
         `The document with id ${document.id} does not exist`,
@@ -120,24 +118,44 @@ export abstract class DatabaseHelper<DocumentData, PopulatedDocumentData> {
 
   async recursivelyResolveReferences(
     documentData: admin.firestore.DocumentData
-  ): Promise<PopulatedDocumentData> {
-    const populatedDocumentData: any = {};
+  ): Promise<admin.firestore.DocumentData> {
+    const populatedDocumentData: admin.firestore.DocumentData = {};
     for (const key in documentData) {
       const value = documentData[key];
-      if (value instanceof admin.firestore.DocumentReference) {
-        const referencedDocument = await (value as admin.firestore.DocumentReference).get();
-        if (referencedDocument.exists) {
-          const referencedDocumentData = referencedDocument.data()!;
-          populatedDocumentData[key] = await this.recursivelyResolveReferences(
-            referencedDocumentData
-          );
-        } else {
-          populatedDocumentData[key] = null;
+      // The value could be an array
+      if (value instanceof Array) {
+        populatedDocumentData[key] = [];
+        for (const iterableValue of value) {
+          if (this.isDocumentReference(iterableValue)) {
+            populatedDocumentData[key].push(
+              await this.resolveReference(iterableValue)
+            );
+          } else {
+            populatedDocumentData[key].push(value);
+          }
         }
       } else {
-        populatedDocumentData[key] = value;
+        if (this.isDocumentReference(value)) {
+          populatedDocumentData[key] = await this.resolveReference(value);
+        } else {
+          populatedDocumentData[key] = value;
+        }
       }
     }
-    return populatedDocumentData as PopulatedDocumentData;
+    return populatedDocumentData;
+  }
+
+  isDocumentReference(value: any): boolean {
+    return value instanceof admin.firestore.DocumentReference;
+  }
+
+  async resolveReference(value: any): Promise<admin.firestore.DocumentData> {
+    const referencedDocument = await (value as admin.firestore.DocumentReference).get();
+    this.checkDocumentExistence(referencedDocument);
+    const referencedDocumentData = referencedDocument.data()!;
+    const populatedDocumentData = await this.recursivelyResolveReferences(
+      referencedDocumentData
+    );
+    return populatedDocumentData;
   }
 }

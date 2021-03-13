@@ -3,8 +3,8 @@ import * as express from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { FormDataFile } from '../../models/form-data-file';
-import { FormDataRequest } from '../../models/form-data-request';
+import { FormDataFile } from '../../models/form-data-file.model';
+import { FormDataRequest } from '../../models/form-data-request.model';
 
 // Code copied from https://mikesukmanowsky.com/firebase-file-and-image-uploads/
 // Applied minor changes to comply to the ts compiler

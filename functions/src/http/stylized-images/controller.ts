@@ -3,20 +3,18 @@ import * as http from 'http';
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import * as sizeOf from 'buffer-image-size';
-import { StylizedImage } from '../../models/stylized-image';
-import { PopulatedStylizedImage } from '../../models/populated-stylized-image';
-import { Image } from '../../models/image';
+import { StylizedImage } from '../../models/stylized-image.model';
+import { PopulatedStylizedImage } from '../../models/populated-stylized-image.model';
+import { Image } from '../../models/image.model';
 import { ContentImageController } from '../content-images/controller';
 import { StyleImageController } from '../style-images/controller';
 import { ImageController } from '../images/controller';
 import { makeHttpRequest } from '../../utils/helpers/http-helper';
-import { TokenRequest } from '../../models/token-request';
+import { TokenRequest } from '../../models/token-request.model';
 import { DatabaseHelper } from '../../utils/helpers/database-helper';
 import { UserRole } from '../../enums/user-role.enum';
-
-interface NstModelResponse {
-  predictions: { stylizedImagePublicUrl: string }[];
-}
+import { NstModelResponse } from '../../models/nst-model-request.model';
+import { ProductCardController } from '../product-cards/controller';
 
 const BUCKET_NAME = 'petai-bdd53.appspot.com';
 const bucket = admin.storage().bucket(BUCKET_NAME);
@@ -33,36 +31,19 @@ export class StylizedImageController extends DatabaseHelper<
     req: TokenRequest,
     res: express.Response
   ): Promise<void> {
-    const { contentImageId, styleImageId, name } = req.body;
+    const { contentImageId, styleImageId } = req.body;
     const { uid: userId, role: userRole = UserRole.User } = req.token;
 
     const contentImageController = new ContentImageController();
-    const contentImageDocumentPromise = contentImageController.collection
-      .doc(contentImageId)
-      .get();
-
     const styleImageController = new StyleImageController();
-    const styleImageDocumentPromise = styleImageController.collection
-      .doc(styleImageId)
-      .get();
 
-    const [contentImageDocument, styleImageDocument] = await Promise.all([
-      contentImageDocumentPromise,
-      styleImageDocumentPromise,
-    ]);
+    const contentImageDocumentReference = contentImageController.collection.doc(
+      contentImageId
+    );
+    const styleImageDocumentReference = styleImageController.collection.doc(
+      styleImageId
+    );
 
-    contentImageController.checkDocumentExistence(contentImageDocument);
-    if (userRole !== UserRole.Admin) {
-      contentImageController.checkDocumentAccess(userId, contentImageDocument);
-    }
-
-    styleImageController.checkDocumentExistence(styleImageDocument);
-    if (userRole !== UserRole.Admin) {
-      styleImageController.checkDocumentAccess(userId, styleImageDocument);
-    }
-
-    const contentImageDocumentReference = contentImageDocument.ref;
-    const styleImageDocumentReference = styleImageDocument.ref;
     const stylizedImageDocuments = await this.collection
       .where('contentImage', '==', contentImageDocumentReference)
       .where('styleImage', '==', styleImageDocumentReference)
@@ -84,15 +65,15 @@ export class StylizedImageController extends DatabaseHelper<
       return;
     }
 
-    const populatedContentImagePromise = contentImageController.populateDocument(
-      contentImageDocument,
-      false,
-      true
+    const populatedContentImagePromise = contentImageController.fetchOne(
+      contentImageId,
+      userId,
+      userRole
     );
-    const populatedStyleImagePromise = styleImageController.populateDocument(
-      styleImageDocument,
-      false,
-      true
+    const populatedStyleImagePromise = styleImageController.fetchOne(
+      styleImageId,
+      userId,
+      userRole
     );
 
     const [populatedContentImage, populatedStyleImage] = await Promise.all([
@@ -128,10 +109,18 @@ export class StylizedImageController extends DatabaseHelper<
       contentImage: contentImageDocumentReference,
       styleImage: styleImageDocumentReference,
       image: imageDocumentReference,
-      name,
       userId: userRole === UserRole.Admin ? '' : userId,
     };
     const stylizedImageDocumentReference = await this.createOne(stylizedImage);
+
+    const productCardController = new ProductCardController();
+    await productCardController.createOrUpdateOneProductCard(
+      contentImageDocumentReference,
+      styleImageDocumentReference,
+      stylizedImageDocumentReference,
+      userId,
+      userRole
+    );
 
     populatedStylizedImage = {
       id: stylizedImageDocumentReference.id,
@@ -140,36 +129,7 @@ export class StylizedImageController extends DatabaseHelper<
       styleImage: populatedStyleImage,
       image,
     };
-
     res.status(201).json(populatedStylizedImage);
-  }
-
-  async fetchOneStylizedImage(
-    req: TokenRequest,
-    res: express.Response
-  ): Promise<void> {
-    const { id } = req.params;
-    const { uid: userId, role: userRole = UserRole.User } = req.token;
-    const populatedStylizedImage = await this.fetchOne(id, userId, userRole);
-    res.status(200).json(populatedStylizedImage);
-  }
-
-  async fetchAllStylizedImages(
-    req: TokenRequest,
-    res: express.Response
-  ): Promise<void> {
-    const { uid: userId, role: userRole = UserRole.User } = req.token;
-    const populatedStylizedImages = await this.fetchAll(userId, userRole);
-    res.status(200).json(populatedStylizedImages);
-  }
-
-  async deleteOneStylizedImage(
-    req: TokenRequest,
-    res: express.Response
-  ): Promise<void> {
-    const { id } = req.params;
-    await this.deleteOne(id);
-    res.status(200).send({ success: true });
   }
 
   async requestNstModel(
@@ -210,5 +170,33 @@ export class StylizedImageController extends DatabaseHelper<
       .slice(bucketPartIndex + 1, imagePublicUrlParts.length)
       .join('/');
     return imagePath;
+  }
+
+  async fetchOneStylizedImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
+    const { id } = req.params;
+    const { uid: userId, role: userRole = UserRole.User } = req.token;
+    const populatedStylizedImage = await this.fetchOne(id, userId, userRole);
+    res.status(200).json(populatedStylizedImage);
+  }
+
+  async fetchAllStylizedImages(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
+    const { uid: userId, role: userRole = UserRole.User } = req.token;
+    const populatedStylizedImages = await this.fetchAll(userId, userRole);
+    res.status(200).json(populatedStylizedImages);
+  }
+
+  async deleteOneStylizedImage(
+    req: TokenRequest,
+    res: express.Response
+  ): Promise<void> {
+    const { id } = req.params;
+    await this.deleteOne(id);
+    res.status(200).send({ success: true });
   }
 }

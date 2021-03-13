@@ -1,6 +1,6 @@
 import * as express from 'express';
-import { FormDataFile } from '../../models/form-data-file';
-import { FormDataRequest } from '../../models/form-data-request';
+import { FormDataFile } from '../../models/form-data-file.model';
+import { FormDataRequest } from '../../models/form-data-request.model';
 import { InvalidUploadException } from '../exceptions/invalid-upload-exception';
 
 const allowedMimeTypes = ['image/jpeg'];

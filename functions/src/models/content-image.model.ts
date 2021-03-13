@@ -1,8 +1,7 @@
 import * as admin from 'firebase-admin';
-import { Image } from './image';
+import { Image } from './image.model';
 
 export interface ContentImage {
   image: admin.firestore.DocumentReference<Image>;
-  name: string;
-  userId: string | null;
+  userId: string;
 }
