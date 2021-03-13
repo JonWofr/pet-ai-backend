@@ -1,6 +1,6 @@
 import * as express from 'express';
 import { UserRole } from '../../enums/user-role.enum';
-import { TokenRequest } from '../../models/token-request';
+import { TokenRequest } from '../../models/token-request.model';
 import { AuthorizationException } from '../exceptions/authorization-exception';
 
 export const guardRoute = (permittedUserRoles: UserRole[]) => {

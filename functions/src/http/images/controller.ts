@@ -1,9 +1,9 @@
 import * as express from 'express';
 import * as admin from 'firebase-admin';
-import { Image } from '../../models/image';
-import { PopulatedImage } from '../../models/populated-image';
+import { Image } from '../../models/image.model';
+import { PopulatedImage } from '../../models/populated-image.model';
 import { DatabaseHelper } from '../../utils/helpers/database-helper';
-import { FormDataTokenRequest } from '../../models/form-data-token-request';
+import { FormDataTokenRequest } from '../../models/form-data-token-request.model';
 import { uploadFileToGoogleCloudStorage } from '../../utils/helpers/storage-helper';
 import * as sizeOf from 'buffer-image-size';
 

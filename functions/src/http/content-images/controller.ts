@@ -4,11 +4,11 @@ import * as admin from 'firebase-admin';
 import { ImageController } from '../images/controller';
 import { StylizedImageController } from '../stylized-images/controller';
 import { uploadFileToGoogleCloudStorage } from '../../utils/helpers/storage-helper';
-import { Image } from '../../models/image';
-import { ContentImage } from '../../models/content-image';
-import { PopulatedContentImage } from '../../models/populated-content-image';
-import { TokenRequest } from '../../models/token-request';
-import { FormDataTokenRequest } from '../../models/form-data-token-request';
+import { Image } from '../../models/image.model';
+import { ContentImage } from '../../models/content-image.model';
+import { PopulatedContentImage } from '../../models/populated-content-image.model';
+import { TokenRequest } from '../../models/token-request.model';
+import { FormDataTokenRequest } from '../../models/form-data-token-request.model';
 import { DatabaseHelper } from '../../utils/helpers/database-helper';
 import { UserRole } from '../../enums/user-role.enum';
 
@@ -24,7 +24,6 @@ export class ContentImageController extends DatabaseHelper<
     req: FormDataTokenRequest,
     res: express.Response
   ): Promise<void> {
-    const { name } = req.body;
     const { filename, mimetype, buffer } = req.files[0];
     const { uid: userId, role: userRole = UserRole.User } = req.token;
 
@@ -48,7 +47,6 @@ export class ContentImageController extends DatabaseHelper<
     const imageDocumentReference = await imageController.createOne(image);
     const contentImage: ContentImage = {
       image: imageDocumentReference,
-      name,
       userId: userRole === UserRole.Admin ? '' : userId,
     };
     const contentImageDocumentReference = await this.createOne(contentImage);

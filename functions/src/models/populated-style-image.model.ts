@@ -1,4 +1,4 @@
-import { PopulatedImage } from './populated-image';
+import { PopulatedImage } from './populated-image.model';
 
 export interface PopulatedStyleImage {
   id?: string;

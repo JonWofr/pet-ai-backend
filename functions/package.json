@@ -2,7 +2,7 @@
   "name": "functions",
   "scripts": {
     "lint": "tslint --project tsconfig.json",
-    "build": "tsc",
+    "build": "npm run lint && tsc",
     "build:watch": "npm run lint && tsc -w",
     "serve": "firebase emulators:start --import=../firestore-emulator-data --export-on-exit",
     "serve:inspect": "firebase emulators:start --inspect-functions --import=../firestore-emulator-data --export-on-exit",
